@@ -1,0 +1,9 @@
+# Copy to backend.hcl and init with:  terraform init -backend-config=backend.hcl
+# Bring your own Storage Account + blob container for Terraform state.
+# Auth is Entra/AAD-RBAC via az login — no shared-access-key secrets in here.
+
+resource_group_name  = "<your-tfstate-resource-group>"
+storage_account_name = "<your-tfstate-storage-account>"
+container_name       = "<your-tfstate-container>"
+key                  = "azure/sie-cluster/dev-nc4ast4-spot.tfstate"
+use_azuread_auth     = true
