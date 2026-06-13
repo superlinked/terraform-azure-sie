@@ -1,18 +1,18 @@
 # SIE AKS Terraform Module
 
-One command to get a GPU-ready AKS cluster for [SIE](https://github.com/superlinked/sie) (Search Inference Engine). The module creates everything you need — VNet, AKS, GPU pools, container registry, autoscaling — so you can focus on running inference, not managing infrastructure.
+One command to get a GPU-ready AKS cluster for [SIE](https://github.com/superlinked/sie) (Search Inference Engine). The module creates everything you need - VNet, AKS, GPU pools, container registry, autoscaling - so you can focus on running inference, not managing infrastructure.
 
 ## What you get
 
 - **AKS cluster** with Workload Identity + OIDC issuer + AAD-RBAC
-- **GPU node pool** — pick your GPU via `gpu_class`: `t4` (NC4as_T4_v3), `a10` (NV6ads_A10_v5), `a100` (NC24ads_A100_v4), or `h100` (NC40ads_H100_v5)
-- **Scale-to-zero** — GPU pools scale down to zero when idle, so you only pay when running inference
-- **Built-in cluster autoscaler** — per-pool, configured directly on the AKS node pools (no separate Helm chart to deploy or upgrade)
-- **NVIDIA device plugin** — installed via Helm so GPU pods schedule immediately
-- **ACR repository** (opt-in) — private Premium-SKU container registry; image paths `<acr>.azurecr.io/<project>/{sie-server,sie-gateway,sie-config}`
-- **Workload Identity** — pods authenticate to Azure without stored credentials
-- **Private endpoints** (opt-in) — private connectivity to ACR + Storage via `privatelink.*` DNS zones
-- **Managed CSI** — persistent volumes work out of the box
+- **GPU node pool** - pick your GPU via `gpu_class`: `t4` (NC4as_T4_v3), `a10` (NV6ads_A10_v5), `a100` (NC24ads_A100_v4), or `h100` (NC40ads_H100_v5)
+- **Scale-to-zero** - GPU pools scale down to zero when idle, so you only pay when running inference
+- **Built-in cluster autoscaler** - per-pool, configured directly on the AKS node pools (no separate Helm chart to deploy or upgrade)
+- **NVIDIA device plugin** - installed via Helm so GPU pods schedule immediately
+- **ACR repository** (opt-in) - private Premium-SKU container registry; image paths `<acr>.azurecr.io/<project>/{sie-server,sie-gateway,sie-config}`
+- **Workload Identity** - pods authenticate to Azure without stored credentials
+- **Private endpoints** (opt-in) - private connectivity to ACR + Storage via `privatelink.*` DNS zones
+- **Managed CSI** - persistent volumes work out of the box
 
 ## Quick start
 
@@ -32,11 +32,11 @@ That's it. After apply, configure kubectl and deploy SIE via Helm:
 $(terraform output -raw kubectl_config_command)
 
 # Deploy SIE (gateway, workers, KEDA, Prometheus, Grafana). The -f flag pulls
-# the AKS overlay (values-aks.yaml) directly from the chart's source repo —
+# the AKS overlay (values-aks.yaml) directly from the chart's source repo -
 # it wires up KEDA, the t4 + a10 machine profiles, and the
 # azure.workload.identity/use=true pod label the AKS Workload Identity webhook
 # keys off of. Pin to a release tag instead of `main` for reproducible installs.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.4 \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.5 \
   -f https://raw.githubusercontent.com/superlinked/sie/main/deploy/helm/sie-cluster/values-aks.yaml \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
@@ -45,7 +45,7 @@ helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster 
 
 ## Examples
 
-Costs shown are approximate West Europe spot list prices at the time of writing — check the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/) for the current rate in your region.
+Costs shown are approximate West Europe spot list prices at the time of writing - check the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/) for the current rate in your region.
 
 | Example | GPU | Cost | Description |
 |---------|-----|------|-------------|
@@ -54,15 +54,15 @@ Costs shown are approximate West Europe spot list prices at the time of writing 
 
 ## Prerequisites
 
-This is a **per-cluster product module**. It does **not** ship its own state-backend or CI-identity bootstrap — those are subscription-wide / landing-zone concerns that you (or your platform team) own once and reuse across every cluster.
+This is a **per-cluster product module**. It does **not** ship its own state-backend or CI-identity bootstrap - those are subscription-wide / landing-zone concerns that you (or your platform team) own once and reuse across every cluster.
 
 1. **Azure subscription + credentials.** `az login` locally (an account with `Contributor` on the target subscription is sufficient), or a federated service principal via the GitHub Actions Azure OIDC flow for CI.
-2. **GPU quota in your target region.** Request from the Azure portal Quotas blade — e.g. *Standard NCASv3_T4 Family vCPUs* for T4, *Standard NVADSA10v5 Family vCPUs* for A10, *Standard NCadsH100v5 Family vCPUs* for H100. H100 quota is the slowest to approve; file the request before the first apply.
+2. **GPU quota in your target region.** Request from the Azure portal Quotas blade - e.g. *Standard NCASv3_T4 Family vCPUs* for T4, *Standard NVADSA10v5 Family vCPUs* for A10, *Standard NCadsH100v5 Family vCPUs* for H100. H100 quota is the slowest to approve; file the request before the first apply.
 3. **Terraform** >= 1.14.
 
 ### CI authentication (GitHub Actions)
 
-If you're running this from CI, the recommended path is the federated Azure OIDC flow — no long-lived secrets. Create a service principal with `Contributor` (and `User Access Administrator` if you use `create_acr=true` or `create_model_cache=true`, which provision role assignments), then set three repo variables (not secrets):
+If you're running this from CI, the recommended path is the federated Azure OIDC flow - no long-lived secrets. Create a service principal with `Contributor` (and `User Access Administrator` if you use `create_acr=true` or `create_model_cache=true`, which provision role assignments), then set three repo variables (not secrets):
 
 ```yaml
 permissions:
@@ -92,13 +92,13 @@ Per-cluster only the `key` field changes.
 
 ### Required
 
-No variables are strictly required — all have sensible defaults. Override these for your environment:
+No variables are strictly required - all have sensible defaults. Override these for your environment:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `location` | `westeurope` | Azure region to deploy in |
 | `project_name` | `sie` | Name prefix for all resources |
-| `owner` | _(required)_ | UPN of the human accountable for this cluster. Populates the CAF `Owner` tag — useful for cost attribution and required if your subscription has a CAF tag-baseline policy. Example: `alice@example.com`. |
+| `owner` | _(required)_ | UPN of the human accountable for this cluster. Populates the CAF `Owner` tag - useful for cost attribution and required if your subscription has a CAF tag-baseline policy. Example: `alice@example.com`. |
 
 ### Provider configuration
 
@@ -136,7 +136,7 @@ If your subscription has no such policy, the tags are still applied (and are use
 |----------|---------|-------------|
 | `gpu_node_pools` | `[]` | List of GPU pool definitions. Each entry needs `name`, `gpu_class` (`t4` / `a10` / `a100` / `h100`), optional `spot`, `node_count`, `max_count` |
 
-Adding A100 or H100 once Azure quota is granted is a **values-only change** — append a new entry to `gpu_node_pools`:
+Adding A100 or H100 once Azure quota is granted is a **values-only change** - append a new entry to `gpu_node_pools`:
 
 ```hcl
 gpu_node_pools = [
@@ -147,7 +147,7 @@ gpu_node_pools = [
 
 **GPU SKU cheat sheet:**
 
-Hourly prices are approximate West Europe on-demand list prices at the time of writing — region, term, and Reserved/Savings Plan commitments all materially change them. Check the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/) for the current rate.
+Hourly prices are approximate West Europe on-demand list prices at the time of writing - region, term, and Reserved/Savings Plan commitments all materially change them. Check the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/) for the current rate.
 
 | `gpu_class` | VM size | GPU | VRAM | Approx. on-demand/hr | Best for |
 |-------------|---------|-----|------|----------------------|----------|
@@ -178,7 +178,7 @@ Hourly prices are approximate West Europe on-demand list prices at the time of w
 | `gateway_acr_repository_name` | `sie-gateway` | |
 | `config_acr_repository_name` | `sie-config` | |
 | `create_acr` | `false` | Whether this module manages the ACR. Default `false` matches the chart's GHCR-by-default behaviour. Set `true` to opt in. `acr_*_repository_url` outputs are emitted regardless. |
-| `acr_repository_prefix` | `null` → `<project_name>` | Namespace prefix for ACR repos. Set to `""` to disable prefixing. |
+| `acr_repository_prefix` | `null` -> `<project_name>` | Namespace prefix for ACR repos. Set to `""` to disable prefixing. |
 
 ### Workload Identity
 
@@ -201,7 +201,7 @@ After `terraform apply`, use these outputs to connect and deploy:
 | `acr_server_repository_url` | Where to push `sie-server` images |
 | `acr_gateway_repository_url` | Where to push `sie-gateway` images |
 | `acr_config_repository_url` | Where to push `sie-config` images |
-| `model_cache_bucket_url` | `abfs(s)://`-style URL — pass to Helm as `workers.common.clusterCache.url` |
+| `model_cache_bucket_url` | `abfs(s)://`-style URL - pass to Helm as `workers.common.clusterCache.url` |
 | `model_cache_helm_args` | Pre-composed Helm `--set` flags for the cache |
 | `ingress_public_ip` | Static ingress IP address (when `create_ingress_public_ip = true`) |
 | `ingress_helm_args` | Pre-composed Helm `--set` flags for ingress-nginx (loadBalancerIP + LB-RG annotation) |
@@ -247,7 +247,7 @@ After `terraform apply`, use these outputs to connect and deploy:
 ## Pushing images to ACR
 > This is optional, because the official images are available under `ghcr.io/superlinked/`.
 
-Requires `create_acr = true` (or an ACR managed by another stack — see `acr_repository_prefix`).
+Requires `create_acr = true` (or an ACR managed by another stack - see `acr_repository_prefix`).
 
 After `terraform apply`, push your SIE Docker images:
 
@@ -285,7 +285,7 @@ Set `create_model_cache = true` and the module:
 After apply, pass the cache URL into Helm with one terraform output:
 
 ```bash
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.4 \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.5 \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
 ```
@@ -298,24 +298,24 @@ See `infra/storage.tf` and `infra/identity.tf` for the resource definitions.
 
 This module follows Azure security best practices out of the box:
 
-- **AAD-RBAC** — no local admin users; cluster authn/authz through Azure AD
-- **Workload Identity** — pods exchange projected SA tokens for AAD tokens; no static credentials
-- **TLS 1.2 minimum** — enforced on Storage + ACR
-- **NAT gateway egress** — predictable outbound IPs for allowlisting
-- **AcrPull on kubelet UAMI** — image pulls without registry passwords
-- **NVIDIA GPU taints** — GPU nodes are tainted so only GPU workloads schedule on them
-- **Container Insights** — control-plane and node logs to Log Analytics (opt-in via `enable_cloud_logging`)
-- **Model-cache storage on-VNet by default** — when `create_model_cache = true`, the storage account's network ACL defaults to `Deny`, allowing only the cluster's system + GPU subnets (via `Microsoft.Storage` service endpoint). Add caller IPs through `storage_allowed_ip_ranges` or override the subnet allowlist via `storage_allowed_subnet_ids`.
-- **Optional private endpoints** — ACR + Storage on Private Link (when `enable_private_endpoints = true`, the network ACL is omitted because public access is already disabled).
+- **AAD-RBAC** - no local admin users; cluster authn/authz through Azure AD
+- **Workload Identity** - pods exchange projected SA tokens for AAD tokens; no static credentials
+- **TLS 1.2 minimum** - enforced on Storage + ACR
+- **NAT gateway egress** - predictable outbound IPs for allowlisting
+- **AcrPull on kubelet UAMI** - image pulls without registry passwords
+- **NVIDIA GPU taints** - GPU nodes are tainted so only GPU workloads schedule on them
+- **Container Insights** - control-plane and node logs to Log Analytics (opt-in via `enable_cloud_logging`)
+- **Model-cache storage on-VNet by default** - when `create_model_cache = true`, the storage account's network ACL defaults to `Deny`, allowing only the cluster's system + GPU subnets (via `Microsoft.Storage` service endpoint). Add caller IPs through `storage_allowed_ip_ranges` or override the subnet allowlist via `storage_allowed_subnet_ids`.
+- **Optional private endpoints** - ACR + Storage on Private Link (when `enable_private_endpoints = true`, the network ACL is omitted because public access is already disabled).
 
 ## Bring-your-own components
 
 Some pieces of a production deployment are intentionally not turnkey:
 
-- **Container registry** — optional. Default `create_acr = false` matches the chart's GHCR default. Set `true` to opt in. To use an external registry, point the Helm chart at it via `gateway.image.repository`, `workers.common.image.repository`, and `config.image.repository`.
-- **TLS certificate** — BYO by default. Set `ingress.tlsConfig.mode` to one of: `byo` (supply your own `kubernetes.io/tls` Secret), `cert-manager` (annotates Ingress for Let's Encrypt HTTP-01; requires cert-manager in the cluster), `self-signed` (chart bootstraps a self-signed root CA — for air-gapped / on-prem), or `disabled` (no TLS resources; TLS terminated upstream of the Ingress).
-- **DNS / domain** — always BYO. The module does not provision Azure DNS zones or records. After `terraform apply`, take the ingress controller's LoadBalancer IP and create an A/AAAA record under a domain you control.
-- **OIDC provider** — BYO. When `auth.enabled: true` in the chart, set `auth.oauth2Proxy.oidcIssuerUrl` and the corresponding client ID / secret to your existing identity provider (Okta, Auth0, Google Workspace, Azure AD, …).
+- **Container registry** - optional. Default `create_acr = false` matches the chart's GHCR default. Set `true` to opt in. To use an external registry, point the Helm chart at it via `gateway.image.repository`, `workers.common.image.repository`, and `config.image.repository`.
+- **TLS certificate** - BYO by default. Set `ingress.tlsConfig.mode` to one of: `byo` (supply your own `kubernetes.io/tls` Secret), `cert-manager` (annotates Ingress for Let's Encrypt HTTP-01; requires cert-manager in the cluster), `self-signed` (chart bootstraps a self-signed root CA - for air-gapped / on-prem), or `disabled` (no TLS resources; TLS terminated upstream of the Ingress).
+- **DNS / domain** - always BYO. The module does not provision Azure DNS zones or records. After `terraform apply`, take the ingress controller's LoadBalancer IP and create an A/AAAA record under a domain you control.
+- **OIDC provider** - BYO. When `auth.enabled: true` in the chart, set `auth.oauth2Proxy.oidcIssuerUrl` and the corresponding client ID / secret to your existing identity provider (Okta, Auth0, Google Workspace, Azure AD, ...).
 
 ## Cleanup
 
@@ -323,4 +323,4 @@ Some pieces of a production deployment are intentionally not turnkey:
 terraform destroy
 ```
 
-**Important**: GPU VMs can be expensive. Always destroy dev/test clusters when not in use. Spot pools (`spot = true`) can reduce cost significantly but can be evicted with no warning (`eviction_policy = "Delete"` — Azure Spot does not have an EC2-style 2-minute interruption notice).
+**Important**: GPU VMs can be expensive. Always destroy dev/test clusters when not in use. Spot pools (`spot = true`) can reduce cost significantly but can be evicted with no warning (`eviction_policy = "Delete"` - Azure Spot does not have an EC2-style 2-minute interruption notice).
