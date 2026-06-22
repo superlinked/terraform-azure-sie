@@ -430,9 +430,9 @@ variable "acr_repository_prefix" {
 # write payloads but cannot touch weights.
 
 variable "create_model_cache" {
-  description = "Whether to create the managed Storage Account + Blob container used as the cluster model cache."
+  description = "Create the managed Storage Account + Blob container backing the model-weights cache (models/) and the payload store for work items >1MB (payloads/). The payload store is required for large payloads such as images, so this defaults to true. Set false only if you bring your own storage (and wire payloadStore.url) or accept that >1MB requests fail."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "model_cache_account_name" {

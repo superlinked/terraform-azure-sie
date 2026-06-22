@@ -36,7 +36,7 @@ $(terraform output -raw kubectl_config_command)
 # it wires up KEDA, the t4 + a10 machine profiles, and the
 # azure.workload.identity/use=true pod label the AKS Workload Identity webhook
 # keys off of. Pin to a release tag instead of `main` for reproducible installs.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.9 \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.10 \
   -f https://raw.githubusercontent.com/superlinked/sie/main/deploy/helm/sie-cluster/values-aks.yaml \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
@@ -62,7 +62,7 @@ This is a **per-cluster product module**. It does **not** ship its own state-bac
 
 ### CI authentication (GitHub Actions)
 
-If you're running this from CI, the recommended path is the federated Azure OIDC flow - no long-lived secrets. Create a service principal with `Contributor` (and `User Access Administrator` if you use `create_acr=true` or `create_model_cache=true`, which provision role assignments), then set three repo variables (not secrets):
+If you're running this from CI, the recommended path is the federated Azure OIDC flow - no long-lived secrets. Create a service principal with `Contributor` and `User Access Administrator` (the latter provisions role assignments, needed for the default `create_model_cache=true` and when `create_acr=true`), then set three repo variables (not secrets):
 
 ```yaml
 permissions:
@@ -275,7 +275,7 @@ SIE clusters benefit from two object-store-backed features that share a single b
 - **Model cache**: pre-staged model weights at `abfs://sie-cache@.../models/`, so workers cold-start from blob storage rather than re-downloading from Hugging Face on every pod spin-up.
 - **Payload store**: large work-item payloads (images, long documents that exceed the 1 MiB NATS in-band budget) at `abfs://sie-cache@.../payloads/`, written by the gateway and read once by the worker. Garbage-collected by a runtime TTL plus a blob lifecycle rule.
 
-Set `create_model_cache = true` and the module:
+Because the payload store is required for >1 MiB work items, the shared blob container is created **by default** (`create_model_cache = true`). With it enabled, the module:
 
 1. Provisions a managed StorageV2 account with versioning, soft delete, and a lifecycle rule that deletes blobs under `sie-cache/payloads/` after one day.
 2. Attaches two ABAC-scoped role assignments to the SIE workload UAMI: `Storage Blob Data Reader` constrained to `models/` and `Storage Blob Data Contributor` constrained to `payloads/`.
@@ -285,12 +285,12 @@ Set `create_model_cache = true` and the module:
 After apply, pass the cache URL into Helm with one terraform output:
 
 ```bash
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.9 \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.10 \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
 ```
 
-The chart auto-derives `payloadStore.url` from `workers.common.clusterCache.url`, so a single `--set` for the cache covers both features. Operators who do not opt in (`create_model_cache = false`, default) skip the storage account and identity additions entirely.
+The chart auto-derives `payloadStore.url` from `workers.common.clusterCache.url`, so a single `--set` for the cache covers both the optional weights cache (`models/`) and the payload store (`payloads/`); the `payload_store_url` output is exposed for visibility and can be wired explicitly via `--set payloadStore.url=...` for the rare override case. On the chart side `payloadStore.enabled` defaults to `true`, decoupled from the optional `workers.common.clusterCache`. Operators who bring their own storage can opt out (`create_model_cache = false`) and wire `payloadStore.url` themselves; skipping the payload store entirely means work items larger than 1 MiB (e.g. images) fail.
 
 See `infra/storage.tf` and `infra/identity.tf` for the resource definitions.
 
