@@ -39,7 +39,7 @@ $(terraform output -raw kubectl_config_command)
 # source repo - it wires up KEDA, the t4 machine profile, and the
 # azure.workload.identity/use=true pod label the AKS Workload Identity webhook
 # keys off of. Pin to a release tag instead of `main` for reproducible installs.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.10 \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.11 \
   -f https://raw.githubusercontent.com/superlinked/sie/main/deploy/helm/sie-cluster/values-aks.yaml \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \

@@ -72,14 +72,36 @@ resource "azurerm_subnet" "private_endpoints" {
 # NSGs
 # =============================================================================
 # AKS recommends NSGs be applied at the subnet level (not the NIC). The
-# default inbound deny + intra-VNet allow is sufficient for the worker
-# subnets; outbound goes through the NAT gateway below.
+# default inbound deny + intra-VNet allow covers the GPU/worker subnet; the
+# system subnet additionally opens the public LoadBalancer / ingress ports,
+# because AKS programs those allow-rules only on its own NIC-level NSG, so a
+# user-managed subnet NSG would otherwise drop inbound to any internet-facing
+# Service. Outbound goes through the NAT gateway below.
 
 resource "azurerm_network_security_group" "system" {
   name                = local.names.nsg_system
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   tags                = local.resource_tags
+
+  # Allow inbound to public LoadBalancer / ingress Services landing on the
+  # system pool. Without this, the default DenyAllInBound silently blocks the
+  # gateway LoadBalancer and ingress-nginx. Gated by var.public_load_balancer_ports
+  # ([] disables it for private clusters).
+  dynamic "security_rule" {
+    for_each = length(var.public_load_balancer_ports) > 0 ? [1] : []
+    content {
+      name                       = "AllowPublicLoadBalancerInbound"
+      priority                   = 4000
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_ranges    = var.public_load_balancer_ports
+      source_address_prefix      = "Internet"
+      destination_address_prefix = "*"
+    }
+  }
 }
 
 resource "azurerm_network_security_group" "gpu" {

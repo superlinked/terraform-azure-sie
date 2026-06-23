@@ -77,7 +77,7 @@ provider "azurerm" {
 
 module "sie_aks" {
   source  = "superlinked/sie/azure"
-  version = "0.6.10"
+  version = "0.6.11"
 
   location     = var.location
   project_name = var.project_name
@@ -103,7 +103,7 @@ module "sie_aks" {
   allow_public_api_server = true
 
   # Dev/single-user flow: give the caller AAD-RBAC Cluster Admin so kubectl
-  # works immediately after `mise run cluster create`. Production examples
+  # works immediately after `terraform apply`. Production examples
   # should leave this off and bind a dedicated AAD group instead.
   grant_admin_to_creator = true
 

@@ -160,7 +160,7 @@ variable "grant_admin_to_creator" {
     Grant the calling identity (terraform's `azurerm_client_config.current`)
     the "Azure Kubernetes Service RBAC Cluster Admin" role on this cluster.
     Set true in single-developer / dev-cluster examples so the operator who
-    just ran `terraform apply` (or `mise run cluster create`) can immediately
+    just ran `terraform apply` can immediately
     `kubectl ...` against AAD-enabled AKS without a separate out-of-band role
     assignment. Leave false in shared/production clusters that bind admin
     via a dedicated AAD group instead.
@@ -179,6 +179,12 @@ variable "allow_public_api_server" {
   description = "Escape hatch to allow a publicly reachable AKS API server (no IP allowlist, no private cluster). Default false so the module fails the plan if neither enable_private_cluster nor api_server_authorized_ip_ranges is set. Flip to true only for short-lived dev clusters."
   type        = bool
   default     = false
+}
+
+variable "public_load_balancer_ports" {
+  description = "Inbound TCP ports allowed from the Internet to the system node subnet for Kubernetes LoadBalancer / ingress Services. The module's subnet NSG must allow these or its default DenyAllInBound drops the traffic: AKS programs LoadBalancer rules only on its own NIC-level NSG, not a user-managed subnet NSG. Defaults cover ingress-nginx (80/443) and a directly-exposed gateway LoadBalancer on 8080. Set to [] for private clusters that take no public inbound."
+  type        = list(string)
+  default     = ["80", "443", "8080"]
 }
 
 variable "system_node_pool" {
