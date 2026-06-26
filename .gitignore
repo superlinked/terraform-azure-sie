@@ -1,0 +1,37 @@
+# Local .terraform directories
+.terraform/
+
+# State files (never commit — may contain secrets)
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Variable files (likely contain sensitive data; *.tfvars.example is NOT matched)
+*.tfvars
+*.tfvars.json
+
+# Override files (used for local-only resource overrides)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Transient lock info created by `terraform apply`
+.terraform.tfstate.lock.info
+
+# Dependency lock file: provider versions are pinned in versions.tf; the lock file
+# is environment-specific and is stripped by the release sync, so it is not committed
+.terraform.lock.hcl
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# Saved plan files
+*tfplan*
+
+# OS / editor cruft
+.DS_Store
