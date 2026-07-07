@@ -324,6 +324,7 @@ variable "gpu_node_pools" {
     zones           = optional(list(string), ["1", "2", "3"])
     labels          = optional(map(string), {})
     node_taints     = optional(list(string), ["nvidia.com/gpu=present:NoSchedule"])
+    gpu_driver      = optional(string, "Install") # "None" for SKUs AKS can't install drivers on (e.g. confidential NCCads_H100_v5); bring your own driver via the NVIDIA GPU operator
   }))
   default = []
 
@@ -344,6 +345,13 @@ variable "gpu_node_pools" {
       for p in var.gpu_node_pools : p.name != "default" && can(regex("^[a-z][a-z0-9]{0,11}$", p.name))
     ])
     error_message = "gpu_node_pools[*].name must be 1-12 lowercase alphanumeric chars (Azure AKS pool name limit) and must not be \"default\"."
+  }
+
+  validation {
+    condition = alltrue([
+      for p in var.gpu_node_pools : contains(["Install", "None"], p.gpu_driver)
+    ])
+    error_message = "Each gpu_node_pools[*].gpu_driver must be \"Install\" or \"None\"."
   }
 
   validation {

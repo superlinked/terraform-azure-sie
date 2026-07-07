@@ -47,8 +47,11 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu" {
   # AKS auto-installs the NVIDIA driver on N-series VMs. Declaring the
   # attribute explicitly prevents `terraform plan` from showing it as drift
   # on every refresh and forcing replacement of the node pool. Matches the
-  # upstream Azure SIE module's pattern.
-  gpu_driver = "Install"
+  # upstream Azure SIE module's pattern. Confidential GPU SKUs (NCCads) are
+  # rejected by AKS managed driver install (VMSizeDoesNotSupportGPU) — set
+  # gpu_driver = "None" on the pool and install the driver via the NVIDIA
+  # GPU operator instead.
+  gpu_driver = each.value.gpu_driver
 
   auto_scaling_enabled = true
   node_count           = each.value.node_count
