@@ -36,7 +36,7 @@ $(terraform output -raw kubectl_config_command)
 # it wires up KEDA, the t4 + a10 machine profiles, and the
 # azure.workload.identity/use=true pod label the AKS Workload Identity webhook
 # keys off of. Pin to a release tag instead of `main` for reproducible installs.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.16 \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.17 \
   -f https://raw.githubusercontent.com/superlinked/sie/main/deploy/helm/sie-cluster/values-aks.yaml \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
@@ -144,6 +144,11 @@ gpu_node_pools = [
   { name = "a100",   gpu_class = "a100",              node_count = 0, max_count = 2 },
 ]
 ```
+
+The default `gpu_class` mapping uses one-GPU VM sizes. For a multi-GPU worker
+pod, override `gpu_node_pools[*].vm_size` to a SKU with enough GPUs, then set
+the matching Helm `workers.pools.<name>.gpu.count` to the number of GPUs the pod
+should consume on one node.
 
 **GPU SKU cheat sheet:**
 
@@ -285,7 +290,7 @@ Because the payload store is required for >1 MiB work items, the shared blob con
 After apply, pass the cache URL into Helm with one terraform output:
 
 ```bash
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.16 \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.6.17 \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
 ```
