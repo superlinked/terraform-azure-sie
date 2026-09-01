@@ -4,9 +4,9 @@
 # Install: brew install tflint (macOS) or see https://github.com/terraform-linters/tflint
 
 config {
-  # Enable all available rules by default
-  module = true
-  force  = false
+  # Analyze repository-owned local module calls without fetching remote modules.
+  call_module_type = "local"
+  force            = false
 }
 
 # =============================================================================
@@ -17,6 +17,12 @@ plugin "azurerm" {
   enabled = true
   version = "0.32.0"
   source  = "github.com/terraform-linters/tflint-ruleset-azurerm"
+}
+
+# Resource lifecycle is caller-owned; this reusable module intentionally
+# supports complete teardown.
+rule "azurerm_resources_missing_prevent_destroy" {
+  enabled = false
 }
 
 # =============================================================================
