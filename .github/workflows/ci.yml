@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
+  terraform:
     name: Terraform lint and validate
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 15
@@ -35,13 +35,13 @@ jobs:
       - name: Set up TFLint
         uses: terraform-linters/setup-tflint@6e1e0642c0289bd619021bf6b34e3c08ed1e005a # v6.3.0
         with:
-          tflint_version: v0.64.0
           cache: true
+          tflint_version: v0.64.0
 
       - name: Check Terraform formatting
         run: terraform fmt -check -recursive -diff
 
-      - name: Initialize TFLint
+      - name: Initialize TFLint plugins
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: tflint --init
