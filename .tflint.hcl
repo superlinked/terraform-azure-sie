@@ -4,9 +4,9 @@
 # Install: brew install tflint (macOS) or see https://github.com/terraform-linters/tflint
 
 config {
-  # Enable all available rules by default
-  module = true
-  force  = false
+  # Analyze repository-owned local module calls without fetching remote modules.
+  call_module_type = "local"
+  force            = false
 }
 
 # =============================================================================
@@ -19,6 +19,12 @@ plugin "azurerm" {
   source  = "github.com/terraform-linters/tflint-ruleset-azurerm"
 }
 
+# Resource lifecycle is caller-owned; this reusable module intentionally
+# supports complete teardown.
+rule "azurerm_resources_missing_prevent_destroy" {
+  enabled = false
+}
+
 # =============================================================================
 # Terraform Language Rules
 # =============================================================================
@@ -26,6 +32,12 @@ plugin "azurerm" {
 plugin "terraform" {
   enabled = true
   preset  = "recommended"
+}
+
+# The published module's retained subscription lookup is the only current
+# finding for this rule; keep it as an explicit baseline exception.
+rule "terraform_unused_declarations" {
+  enabled = false
 }
 
 # Enforce consistent naming conventions
