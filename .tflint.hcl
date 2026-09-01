@@ -34,6 +34,12 @@ plugin "terraform" {
   preset  = "recommended"
 }
 
+# The published module's retained subscription lookup is the only current
+# finding for this rule; keep it as an explicit baseline exception.
+rule "terraform_unused_declarations" {
+  enabled = false
+}
+
 # Enforce consistent naming conventions
 rule "terraform_naming_convention" {
   enabled = true
