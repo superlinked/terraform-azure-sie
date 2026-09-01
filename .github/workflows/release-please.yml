@@ -5,10 +5,13 @@ on:
     branches:
       - main
 
-permissions: {}
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
 
 concurrency:
-  group: release-please-main
+  group: release-please-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -16,12 +19,8 @@ jobs:
     name: Release Please
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
     steps:
-      - name: Run Release Please
+      - name: Create or update release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
