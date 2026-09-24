@@ -53,7 +53,7 @@ Costs shown are approximate West Europe spot list prices at the time of writing 
 | Example | GPU | Cost | Description |
 |---------|-----|------|-------------|
 | [`dev-nc4ast4-spot`](examples/dev-nc4ast4-spot/) | T4 (NC4as_T4_v3) | ~$0.15/hr | Spot VMs, scale 0-5 nodes, minimal cost for development |
-| [`dev-nv6adsa10-spot`](examples/dev-nv6adsa10-spot/) | A10 (NV6ads_A10_v5) | ~$0.35/hr | Spot VMs, scale 0-5 nodes, 24 GiB VRAM for larger embedding bundles |
+| [`dev-nv6adsa10-spot`](examples/dev-nv6adsa10-spot/) | 1/6 A10 (NV6ads_A10_v5) | ~$0.35/hr | Spot VMs, scale 0-5 nodes, 4 GB VRAM per partition; use profiles that fit this memory budget |
 
 ## Prerequisites
 
@@ -160,9 +160,11 @@ Hourly prices are approximate West Europe on-demand list prices at the time of w
 | `gpu_class` | VM size | GPU | VRAM | Approx. on-demand/hr | Best for |
 |-------------|---------|-----|------|----------------------|----------|
 | `t4` | Standard_NC4as_T4_v3 | 1x T4 | 16 GB | ~$0.55 | Development, small models |
-| `a10` | Standard_NV6ads_A10_v5 | 1x A10 | 24 GB | ~$1.10 | Development, medium models |
+| `a10` | Standard_NV6ads_A10_v5 | 1/6 A10 | 4 GB | ~$1.10 | Profiles fitting the 4 GB partition |
 | `a100` | Standard_NC24ads_A100_v4 | 1x A100 | 80 GB | ~$3.50 | Large models, production |
 | `h100` | Standard_NC40ads_H100_v5 | 1x H100 | 80 GB | ~$7.00 | Maximum throughput |
+
+The A10 default uses a fractional GPU. Check the [Microsoft NVadsA10 v5 specifications](https://learn.microsoft.com/azure/virtual-machines/nva10v5-series) and ensure model weights, runtime overhead, and request memory fit within its 4 GB allocation.
 
 ### Networking
 

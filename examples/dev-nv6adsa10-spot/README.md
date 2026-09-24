@@ -1,13 +1,13 @@
 # Development Cluster with NV6ads A10 Spot GPUs
 
-Creates a minimal AKS cluster with a single `Standard_NV6ads_A10_v5` spot GPU pool (NVIDIA A10, 24 GiB VRAM). Pick this over [`dev-nc4ast4-spot`](../dev-nc4ast4-spot/) when running models that need more than the 16 GiB of VRAM a T4 ships with.
+Creates a minimal AKS cluster with a single `Standard_NV6ads_A10_v5` spot GPU pool. Each node receives **1/6 of an NVIDIA A10 with 4 GB of GPU memory**, as specified in the [Microsoft NVadsA10 v5 documentation](https://learn.microsoft.com/azure/virtual-machines/nva10v5-series). Use only model profiles whose weights, runtime overhead, and request memory fit within that partition.
 
 ## What this example creates
 
 | Resource | Configuration |
 |----------|---------------|
 | AKS cluster | Public API endpoint, AAD-RBAC, Workload Identity + OIDC issuer, Kubernetes default version |
-| GPU node pool | 1x NVIDIA A10 per node (Standard_NV6ads_A10_v5), spot, scale 0-5 |
+| GPU node pool | 1/6 NVIDIA A10 with 4 GB per node (Standard_NV6ads_A10_v5), spot, scale 0-5 |
 | System node pool | Standard_B4ms (system workloads - burstable 4 vCPU / 16 GiB), scale 1-5 across zones 1/2/3 |
 | VNet | Single VNet, three subnets (system, GPU, private-endpoint), Cilium network policy |
 | NAT gateway | One NAT gateway with a /28 public IP prefix concentrating worker egress |
@@ -18,15 +18,15 @@ Creates a minimal AKS cluster with a single `Standard_NV6ads_A10_v5` spot GPU po
 
 **Estimated cost**: ~$0.35/hr (approx. West Europe spot list price at the time of writing) while a GPU node is running. Near $0/hr when scaled to zero (AKS Standard tier control-plane fee only). Verify the current rate in the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/).
 
-## When to pick A10 over T4
+## GPU memory compared with T4
 
-| | T4 (`dev-nc4ast4-spot`) | A10 (this example) |
+| | T4 (`dev-nc4ast4-spot`) | Fractional A10 (this example) |
 |---|---|---|
-| VRAM | 16 GiB | 24 GiB |
+| VRAM | 16 GB | 4 GB |
 | Spot price (West Europe, approx.) | ~$0.15/hr | ~$0.35/hr |
-| Best for | Small embedding bundles (bge-m3, e5-base) | Larger embedding bundles, bge-multilingual-gemma2, longer context |
+| Model selection | Profiles fitting 16 GB | Profiles fitting 4 GB, including runtime overhead |
 
-If your bundle fits on T4, prefer `dev-nc4ast4-spot` - it's noticeably cheaper. Verify current rates in the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/).
+The CPU and memory resource limits in `values-sie.yaml` describe host resources; they do not increase the GPU's 4 GB allocation. Verify current rates in the [Azure pricing calculator](https://azure.microsoft.com/pricing/calculator/).
 
 ## Usage
 

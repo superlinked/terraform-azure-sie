@@ -1,10 +1,10 @@
 # SIE AKS Cluster — Development Example (NV6ads A10 Spot)
 #
 # Creates an AKS cluster with one Standard_NV6ads_A10_v5 spot GPU pool
-# (NVIDIA A10), scale-to-zero (min=0), and up to 5 GPU nodes. A10 doubles
-# the VRAM of T4 (24 GiB vs 16 GiB) at ~2x the cost — pick this over the
-# dev-nc4ast4-spot example when running models that don't fit on T4
-# (e.g. larger embedding bundles, bge-multilingual-gemma2).
+# (1/6 NVIDIA A10 with 4 GB GPU memory), scale-to-zero (min=0), and up to
+# 5 GPU nodes. Use only model profiles whose weights, runtime overhead,
+# and request memory fit within the 4 GB partition.
+# Specs: https://learn.microsoft.com/azure/virtual-machines/nva10v5-series
 #
 # Terraform = cloud infra only. K8s resources deployed via Helm:
 #
