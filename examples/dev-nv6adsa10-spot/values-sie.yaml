@@ -1,0 +1,33 @@
+# Apply after the SIE v0.8.2 values-aks.yaml overlay.
+workers:
+  pools:
+    t4:
+      enabled: false
+    a10:
+      enabled: true
+      machineProfile: a10
+      gpuType: a10
+      nodeSelector:
+        sie.superlinked.com/gpu-type: a10
+      gpu:
+        count: 1
+        product: NVIDIA-A10
+      resources:
+        requests:
+          cpu: "2"
+          memory: "8Gi"
+        limits:
+          cpu: "4"
+          memory: "16Gi"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      bundles:
+        default:
+          minReplicas: 0
+          maxReplicas: 5

@@ -35,13 +35,16 @@ $(terraform output -raw kubectl_config_command)
 # the AKS overlay (values-aks.yaml) directly from the chart's source repo -
 # it wires up KEDA, the t4 + a10 machine profiles, and the
 # azure.workload.identity/use=true pod label the AKS Workload Identity webhook
-# keys off of. Pin to a release tag instead of `main` for reproducible installs.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.7.2 \
-  -f https://raw.githubusercontent.com/superlinked/sie/main/deploy/helm/sie-cluster/values-aks.yaml \
+# keys off of. The chart and overlay are pinned to the same SIE release.
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.8.2 \
+  -f https://raw.githubusercontent.com/superlinked/sie/v0.8.2/deploy/helm/sie-cluster/values-aks.yaml \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
 ```
+
+The chart selects the SIE `v0.8.2` images through its `appVersion`. The Terraform module release is versioned independently.
+For custom model profiles, review the [0.8.0 breaking changes](https://github.com/superlinked/sie/releases/tag/v0.8.0) before upgrading from 0.7.x.
 
 ## Examples
 
@@ -254,24 +257,27 @@ After `terraform apply`, use these outputs to connect and deploy:
 
 Requires `create_acr = true` (or an ACR managed by another stack - see `acr_repository_prefix`).
 
-After `terraform apply`, push your SIE Docker images:
+After `terraform apply`, mirror the published SIE 0.8.2 images. The AKS overlay enables the `default` CUDA 12 worker bundle:
 
 ```bash
 # Authenticate Docker to ACR
 az acr login --name $(terraform output -raw acr_name)
 
-# Push server image
-docker tag sie-server:latest $(terraform output -raw acr_server_repository_url):latest
-docker push $(terraform output -raw acr_server_repository_url):latest
+# Mirror the default CUDA 12 worker image
+docker pull --platform linux/amd64 ghcr.io/superlinked/sie-server:v0.8.2-cuda12-default
+docker tag ghcr.io/superlinked/sie-server:v0.8.2-cuda12-default "$(terraform output -raw acr_server_repository_url):v0.8.2-cuda12-default"
+docker push "$(terraform output -raw acr_server_repository_url):v0.8.2-cuda12-default"
 
-# Push gateway image
-docker tag sie-gateway:latest $(terraform output -raw acr_gateway_repository_url):latest
-docker push $(terraform output -raw acr_gateway_repository_url):latest
-
-# Push sie-config image
-docker tag sie-config:latest $(terraform output -raw acr_config_repository_url):latest
-docker push $(terraform output -raw acr_config_repository_url):latest
+# Mirror gateway and config images
+docker pull --platform linux/amd64 ghcr.io/superlinked/sie-gateway:v0.8.2
+docker tag ghcr.io/superlinked/sie-gateway:v0.8.2 "$(terraform output -raw acr_gateway_repository_url):v0.8.2"
+docker push "$(terraform output -raw acr_gateway_repository_url):v0.8.2"
+docker pull --platform linux/amd64 ghcr.io/superlinked/sie-config:v0.8.2
+docker tag ghcr.io/superlinked/sie-config:v0.8.2 "$(terraform output -raw acr_config_repository_url):v0.8.2"
+docker push "$(terraform output -raw acr_config_repository_url):v0.8.2"
 ```
+
+When using these ACR repositories, set `workers.common.image.repository`, `gateway.image.repository`, and `config.image.repository` to the matching Terraform outputs. Leave their tag values unset so chart 0.8.2 selects the versioned tags above. The worker sidecar continues to use its published GHCR image; mirror any additional worker bundles or services before overriding their repositories.
 
 ## Model cache and payload store
 
@@ -290,7 +296,9 @@ Because the payload store is required for >1 MiB work items, the shared blob con
 After apply, pass the cache URL into Helm with one terraform output:
 
 ```bash
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.7.2 \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.8.2 \
+  -f https://raw.githubusercontent.com/superlinked/sie/v0.8.2/deploy/helm/sie-cluster/values-aks.yaml \
+  --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
 ```
