@@ -1,10 +1,10 @@
 # SIE AKS Cluster — Development Example (NV6ads A10 Spot)
 #
 # Creates an AKS cluster with one Standard_NV6ads_A10_v5 spot GPU pool
-# (NVIDIA A10), scale-to-zero (min=0), and up to 5 GPU nodes. A10 doubles
-# the VRAM of T4 (24 GiB vs 16 GiB) at ~2x the cost — pick this over the
-# dev-nc4ast4-spot example when running models that don't fit on T4
-# (e.g. larger embedding bundles, bge-multilingual-gemma2).
+# (1/6 NVIDIA A10 with 4 GB GPU memory), scale-to-zero (min=0), and up to
+# 5 GPU nodes. Use only model profiles whose weights, runtime overhead,
+# and request memory fit within the 4 GB partition.
+# Specs: https://learn.microsoft.com/azure/virtual-machines/nva10v5-series
 #
 # Terraform = cloud infra only. K8s resources deployed via Helm:
 #
@@ -12,8 +12,9 @@
 #   # Populate the model cache (only if create_model_cache=true):
 #   sie-admin cache populate --bundle default \
 #     --target $(terraform output -raw model_cache_bucket_url)/
-#   helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster \
-#     -f https://raw.githubusercontent.com/superlinked/sie/main/values-aks.yaml \
+#   helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.8.2 \
+#     -f https://raw.githubusercontent.com/superlinked/sie/v0.8.2/deploy/helm/sie-cluster/values-aks.yaml \
+#     -f values-sie.yaml \
 #     --namespace sie --create-namespace \
 #     --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
 #     $(terraform output -raw model_cache_helm_args)

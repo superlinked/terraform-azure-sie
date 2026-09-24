@@ -38,9 +38,9 @@ $(terraform output -raw kubectl_config_command)
 # -f flag pulls the AKS overlay (values-aks.yaml) directly from the chart's
 # source repo - it wires up KEDA, the t4 machine profile, and the
 # azure.workload.identity/use=true pod label the AKS Workload Identity webhook
-# keys off of. Pin to a release tag instead of `main` for reproducible installs.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.7.2 \
-  -f https://raw.githubusercontent.com/superlinked/sie/main/deploy/helm/sie-cluster/values-aks.yaml \
+# keys off of. The chart and overlay are pinned to the same SIE release.
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.8.2 \
+  -f https://raw.githubusercontent.com/superlinked/sie/v0.8.2/deploy/helm/sie-cluster/values-aks.yaml \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
