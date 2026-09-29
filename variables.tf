@@ -170,7 +170,7 @@ variable "grant_admin_to_creator" {
 }
 
 variable "api_server_authorized_ip_ranges" {
-  description = "IPv4 CIDR blocks authorized to reach the AKS API server. Include every machine that runs terraform, kubectl, or helm against the cluster: the module installs a Helm release during apply. The module adds the NAT gateway egress prefix, so at most 199 entries fit the AKS limit of 200. An empty list means no IP allowlist (AKS treats this as open), so the plan fails unless enable_private_cluster or allow_public_api_server is set. AKS does not support authorized ranges on private clusters, so leave this empty with enable_private_cluster. Together the ranges may cover at most 16,777,216 addresses (one /8) unless allow_public_api_server = true. Documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24) are rejected."
+  description = "IPv4 CIDR blocks authorized to reach the AKS API server. Include every machine that runs terraform, kubectl, or helm against the cluster: the module installs a Helm release during apply. The module adds the NAT gateway egress prefix, so at most 199 entries fit the AKS limit of 200. An empty list means no IP allowlist (AKS treats this as open), so the plan fails unless enable_private_cluster or allow_public_api_server is set. AKS does not support authorized ranges on private clusters, so leave this empty with enable_private_cluster. Together the ranges may cover at most 16,777,216 addresses (one /8) unless allow_public_api_server = true. Entries inside a documentation range (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24) are rejected, and broader entries that contain one need allow_public_api_server = true."
   type        = list(string)
   default     = []
   nullable    = false
@@ -188,12 +188,15 @@ variable "api_server_authorized_ip_ranges" {
   validation {
     condition = alltrue([
       for cidr in var.api_server_authorized_ip_ranges : !try(
-        tonumber(split("/", cidr)[1]) >= 24
-        && contains(["192.0.2", "198.51.100", "203.0.113"], join(".", slice(split(".", cidrhost(cidr, 0)), 0, 3))),
+        (tonumber(split("/", cidr)[1]) >= 24 || !var.allow_public_api_server)
+        && anytrue([
+          for doc in ["192.0.2.0", "198.51.100.0", "203.0.113.0"] :
+          cidrhost("${cidrhost(cidr, 0)}/${min(tonumber(split("/", cidr)[1]), 24)}", 0) == cidrhost("${doc}/${min(tonumber(split("/", cidr)[1]), 24)}", 0)
+        ]),
         false
       )
     ])
-    error_message = "api_server_authorized_ip_ranges contains a documentation range (192.0.2.0/24, 198.51.100.0/24, or 203.0.113.0/24), such as the README placeholder. Replace it with the real egress address of the machines that need API access."
+    error_message = "api_server_authorized_ip_ranges overlaps a documentation range (192.0.2.0/24, 198.51.100.0/24, or 203.0.113.0/24), such as the README placeholder. Replace it with the real egress address of the machines that need API access. A broader range that contains a documentation range needs allow_public_api_server = true."
   }
 
   validation {
@@ -230,7 +233,7 @@ variable "public_load_balancer_ports" {
 }
 
 variable "public_load_balancer_allowed_ip_ranges" {
-  description = "Source IPv4 CIDR blocks allowed to reach public_load_balancer_ports on the system node subnet. Together the ranges may cover at most 16,777,216 addresses (one /8) unless allow_public_load_balancer = true. Documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24) are rejected."
+  description = "Source IPv4 CIDR blocks allowed to reach public_load_balancer_ports on the system node subnet. Together the ranges may cover at most 16,777,216 addresses (one /8) unless allow_public_load_balancer = true. Entries inside a documentation range (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24) are rejected, and broader entries that contain one need allow_public_load_balancer = true."
   type        = list(string)
   default     = []
   nullable    = false
@@ -243,12 +246,15 @@ variable "public_load_balancer_allowed_ip_ranges" {
   validation {
     condition = alltrue([
       for cidr in var.public_load_balancer_allowed_ip_ranges : !try(
-        tonumber(split("/", cidr)[1]) >= 24
-        && contains(["192.0.2", "198.51.100", "203.0.113"], join(".", slice(split(".", cidrhost(cidr, 0)), 0, 3))),
+        (tonumber(split("/", cidr)[1]) >= 24 || !var.allow_public_load_balancer)
+        && anytrue([
+          for doc in ["192.0.2.0", "198.51.100.0", "203.0.113.0"] :
+          cidrhost("${cidrhost(cidr, 0)}/${min(tonumber(split("/", cidr)[1]), 24)}", 0) == cidrhost("${doc}/${min(tonumber(split("/", cidr)[1]), 24)}", 0)
+        ]),
         false
       )
     ])
-    error_message = "public_load_balancer_allowed_ip_ranges contains a documentation range (192.0.2.0/24, 198.51.100.0/24, or 203.0.113.0/24). Replace it with the real client ranges."
+    error_message = "public_load_balancer_allowed_ip_ranges overlaps a documentation range (192.0.2.0/24, 198.51.100.0/24, or 203.0.113.0/24). Replace it with the real client ranges. A broader range that contains a documentation range needs allow_public_load_balancer = true."
   }
 
   validation {

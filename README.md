@@ -218,8 +218,9 @@ Rules for `api_server_authorized_ip_ranges` and
   the size of one `/8`. `0.0.0.0/0`, split halves such as two `/1` blocks, and
   several broad ranges are rejected unless the matching `allow_public_*`
   opt-in is set.
-- Documentation ranges (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`)
-  are rejected, so an unedited placeholder fails at plan time.
+- Entries inside a documentation range (`192.0.2.0/24`, `198.51.100.0/24`,
+  `203.0.113.0/24`) are rejected, so an unedited placeholder fails at plan
+  time. Broader entries that contain one need the matching opt-in.
 - `api_server_authorized_ip_ranges` takes at most 199 entries, because the
   module adds the NAT gateway prefix and AKS allows 200.
 
@@ -235,10 +236,10 @@ existing entries (including the NAT gateway prefix). Then set
 `api_server_authorized_ip_ranges` to match and apply:
 
 ```bash
-az aks show -g <resource-group> -n <cluster> \
-  --query apiServerAccessProfile.authorizedIpRanges -o tsv
+existing="$(az aks show -g <resource-group> -n <cluster> \
+  --query "join(',', apiServerAccessProfile.authorizedIpRanges)" -o tsv)"
 az aks update -g <resource-group> -n <cluster> \
-  --api-server-authorized-ip-ranges "<existing-ranges>,<your-cidr>"
+  --api-server-authorized-ip-ranges "$existing,<your-cidr>"
 ```
 
 Alternatively, correct the variable and run

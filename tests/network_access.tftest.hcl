@@ -126,6 +126,27 @@ run "rejects_documentation_placeholder" {
   expect_failures = [var.api_server_authorized_ip_ranges]
 }
 
+run "rejects_documentation_placeholder_even_with_opt_in" {
+  command = plan
+
+  variables {
+    allow_public_api_server         = true
+    api_server_authorized_ip_ranges = ["203.0.113.10/32"]
+  }
+
+  expect_failures = [var.api_server_authorized_ip_ranges]
+}
+
+run "rejects_range_containing_documentation_range" {
+  command = plan
+
+  variables {
+    api_server_authorized_ip_ranges = ["203.0.112.0/23"]
+  }
+
+  expect_failures = [var.api_server_authorized_ip_ranges]
+}
+
 run "rejects_allowlist_without_room_for_nat_prefix" {
   command = plan
 
@@ -288,6 +309,18 @@ run "rejects_documentation_load_balancer_source" {
     api_server_authorized_ip_ranges        = ["8.8.8.8/32"]
     public_load_balancer_ports             = ["443"]
     public_load_balancer_allowed_ip_ranges = ["198.51.100.0/24"]
+  }
+
+  expect_failures = [var.public_load_balancer_allowed_ip_ranges]
+}
+
+run "rejects_load_balancer_source_containing_documentation_range" {
+  command = plan
+
+  variables {
+    api_server_authorized_ip_ranges        = ["8.8.8.8/32"]
+    public_load_balancer_ports             = ["443"]
+    public_load_balancer_allowed_ip_ranges = ["198.51.100.0/23"]
   }
 
   expect_failures = [var.public_load_balancer_allowed_ip_ranges]
