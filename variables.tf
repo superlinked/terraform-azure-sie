@@ -221,7 +221,7 @@ variable "allow_public_api_server" {
 }
 
 variable "public_load_balancer_ports" {
-  description = "Inbound TCP ports to open on the system node subnet for Kubernetes LoadBalancer / ingress Services, such as [\"443\"] for an ingress controller. The module's subnet NSG must allow these or its default DenyAllInBound drops the traffic: AKS programs LoadBalancer rules only on its own NIC-level NSG, not a user-managed subnet NSG. Default [] takes no inbound traffic from outside the VNet. Non-empty ports need public_load_balancer_allowed_ip_ranges or allow_public_load_balancer."
+  description = "Inbound TCP ports to open on the system node subnet for Kubernetes LoadBalancer / ingress Services, such as [\"443\"] for an ingress controller. The module's subnet NSG must allow these or its default DenyAllInBound drops the traffic: AKS programs LoadBalancer rules only on its own NIC-level NSG, not a user-managed subnet NSG. Default [] takes no inbound traffic from outside the VNet. Non-empty ports need public_load_balancer_allowed_ip_ranges or allow_public_load_balancer. The module owns every rule on the system subnet NSG, so rules added to it outside the module are removed on the next apply."
   type        = list(string)
   default     = []
   nullable    = false

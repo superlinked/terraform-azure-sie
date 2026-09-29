@@ -209,6 +209,11 @@ Services on the system node subnet is closed by default:
 | `public_load_balancer_allowed_ip_ranges` | `[]` | Source CIDRs allowed to reach those ports. Required when ports are set, unless `allow_public_load_balancer = true`. |
 | `allow_public_load_balancer` | `false` | Explicit opt-in to accept any Internet address on those ports (the NSG `Internet` service tag). |
 
+The module owns every rule on the system subnet NSG: it sets the full rule list
+(`[]` by default), so rules added outside the module, in the portal or with
+`azurerm_network_security_rule` resources targeting this NSG, are removed on
+the next apply. Express additional inbound access through the variables above.
+
 Rules for `api_server_authorized_ip_ranges` and
 `public_load_balancer_allowed_ip_ranges`:
 
@@ -266,6 +271,9 @@ run a normal plan.
   - To keep the previous rule exactly, set
     `public_load_balancer_ports = ["80", "443", "8080"]` and
     `allow_public_load_balancer = true`.
+  - The module now owns every rule on the system NSG. Rules added to it
+    outside the module (portal, or `azurerm_network_security_rule`) are
+    removed on the next apply, so move them into the variables above first.
 
 ### Container registry
 
