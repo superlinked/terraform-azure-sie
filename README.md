@@ -20,12 +20,19 @@ One command to get a GPU-ready AKS cluster for [SIE](https://github.com/superlin
 cd examples/dev-nc4ast4-spot
 az login
 az account set --subscription "<subscription_id>"
+# CIDRs allowed to reach the Kubernetes API; include this machine's egress
+# address (for example the /32 of `curl -s https://checkip.amazonaws.com`).
+export TF_VAR_api_server_authorized_ip_ranges='["203.0.113.10/32"]'
 terraform init
 terraform plan
 terraform apply
 ```
 
-That's it. After apply, configure kubectl and deploy SIE via Helm:
+`203.0.113.10/32` is a documentation placeholder. See
+[Kubernetes API and load balancer access](#kubernetes-api-and-load-balancer-access)
+for the private-cluster mode.
+
+After apply, configure kubectl and deploy SIE via Helm:
 
 ```bash
 # Point kubectl at the new cluster
@@ -95,7 +102,9 @@ Per-cluster only the `key` field changes.
 
 ### Required
 
-No variables are strictly required - all have sensible defaults. Override these for your environment:
+Set `owner` and choose how the Kubernetes API is reached (see
+[Kubernetes API and load balancer access](#kubernetes-api-and-load-balancer-access));
+the plan fails until you do. Override these for your environment:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -174,11 +183,50 @@ The A10 default uses a fractional GPU. Check the [Microsoft NVadsA10 v5 specific
 | `system_subnet_cidr` | `10.0.0.0/22` | System pool subnet |
 | `gpu_subnet_cidr` | `10.0.4.0/22` | GPU pool subnet |
 | `private_endpoint_subnet_cidr` | `10.0.8.0/24` | Private-endpoint subnet |
-| `enable_private_cluster` | `false` | Toggle a private API endpoint |
-| `api_server_authorized_ip_ranges` | `[]` | CIDRs allowed to reach the API server |
 | `create_ingress_public_ip` | `false` | Provision a static public IP for the ingress controller in the cluster RG so DNS survives a cluster destroy/recreate |
 | `deletion_protection` | `true` | Place a CanNotDelete management lock on the AKS cluster (set false for dev) |
 | `automatic_upgrade_channel` | `stable` | AKS auto-upgrade channel (`patch` / `rapid` / `stable` / `node-image` / `none`) |
+
+### Kubernetes API and load balancer access
+
+Neither the AKS API server nor the system subnet is open to the whole
+Internet unless you ask for it. For the API server, the plan fails until you
+choose one mode:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `api_server_authorized_ip_ranges` | `[]` | CIDRs allowed to reach the API server. Include every machine that runs `terraform`, `kubectl`, or `helm` against the cluster: the module installs the NVIDIA device plugin Helm release during apply. |
+| `enable_private_cluster` | `false` | Serve the API server only on a private endpoint in the VNet. Run Terraform, kubectl, and Helm from a network that reaches the VNet. Changing it replaces the cluster. |
+| `allow_public_api_server` | `false` | Explicit opt-in to accept any Internet address on the API server. |
+
+Inbound traffic from outside the VNet to Kubernetes `LoadBalancer` or ingress
+Services on the system node subnet is closed by default:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `public_load_balancer_ports` | `[]` | TCP ports to open on the system subnet NSG, such as `["443"]` for an ingress controller. |
+| `public_load_balancer_allowed_ip_ranges` | `[]` | Source CIDRs allowed to reach those ports. Required when ports are set, unless `allow_public_load_balancer = true`. |
+| `allow_public_load_balancer` | `false` | Explicit opt-in to accept any Internet address on those ports (the NSG `Internet` service tag). |
+
+Ranges broader than `/8` (IPv4) or `/16` (IPv6), including `0.0.0.0/0` and
+`::/0`, are rejected unless the matching `allow_public_*` opt-in is set. The
+chart's gateway and config Services are `ClusterIP` by default, and exposing
+the gateway also needs the authentication and TLS settings described in the
+chart README.
+
+**Upgrading from 0.x.**
+
+- `api_server_authorized_ip_ranges` entries must be CIDR blocks, and ranges
+  broader than `/8` or `/16` now need `allow_public_api_server = true`.
+  Configurations that set `allow_public_api_server`, `enable_private_cluster`,
+  or narrower ranges plan without API server changes.
+- The system subnet NSG no longer opens `80`, `443`, and `8080` to the
+  Internet by default. The plan shows an in-place update of the system NSG
+  that removes the `AllowPublicLoadBalancerInbound` rule. To keep a reachable
+  ingress, set `public_load_balancer_ports` and
+  `public_load_balancer_allowed_ip_ranges`. To keep the previous rule exactly,
+  set `public_load_balancer_ports = ["80", "443", "8080"]` and
+  `allow_public_load_balancer = true`; the plan then shows no NSG change.
 
 ### Container registry
 
@@ -314,6 +362,8 @@ See `infra/storage.tf` and `infra/identity.tf` for the resource definitions.
 This module follows Azure security best practices out of the box:
 
 - **AAD-RBAC** - no local admin users; cluster authn/authz through Azure AD
+- **Restricted API server** - reachable only from `api_server_authorized_ip_ranges` or through a private cluster; any-address access needs `allow_public_api_server`
+- **Closed system subnet** - no inbound from outside the VNet unless `public_load_balancer_ports` and their sources are set
 - **Workload Identity** - pods exchange projected SA tokens for AAD tokens; no static credentials
 - **TLS 1.2 minimum** - enforced on Storage + ACR
 - **NAT gateway egress** - predictable outbound IPs for allowlisting

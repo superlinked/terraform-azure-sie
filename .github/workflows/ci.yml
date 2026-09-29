@@ -53,3 +53,16 @@ jobs:
 
       - name: Validate Terraform
         run: terraform validate -no-color
+
+      - name: Run network access tests
+        run: terraform test -filter=tests/network_access.tftest.hcl -no-color
+
+      - name: Initialize Terraform examples
+        run: |
+          terraform -chdir=examples/dev-nc4ast4-spot init -backend=false -input=false -no-color
+          terraform -chdir=examples/dev-nv6adsa10-spot init -backend=false -input=false -no-color
+
+      - name: Validate Terraform examples
+        run: |
+          terraform -chdir=examples/dev-nc4ast4-spot validate -no-color
+          terraform -chdir=examples/dev-nv6adsa10-spot validate -no-color

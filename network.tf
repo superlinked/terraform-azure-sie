@@ -73,10 +73,10 @@ resource "azurerm_subnet" "private_endpoints" {
 # =============================================================================
 # AKS recommends NSGs be applied at the subnet level (not the NIC). The
 # default inbound deny + intra-VNet allow covers the GPU/worker subnet; the
-# system subnet additionally opens the public LoadBalancer / ingress ports,
-# because AKS programs those allow-rules only on its own NIC-level NSG, so a
-# user-managed subnet NSG would otherwise drop inbound to any internet-facing
-# Service. Outbound goes through the NAT gateway below.
+# system subnet can additionally open LoadBalancer / ingress ports, because AKS
+# programs those allow-rules only on its own NIC-level NSG, so a user-managed
+# subnet NSG would otherwise drop inbound to any internet-facing Service.
+# Outbound goes through the NAT gateway below.
 
 resource "azurerm_network_security_group" "system" {
   name                = local.names.nsg_system
@@ -84,12 +84,11 @@ resource "azurerm_network_security_group" "system" {
   location            = azurerm_resource_group.main.location
   tags                = local.resource_tags
 
-  # Allow inbound to public LoadBalancer / ingress Services landing on the
-  # system pool. Without this, the default DenyAllInBound silently blocks the
-  # gateway LoadBalancer and ingress-nginx. Gated by var.public_load_balancer_ports
-  # ([] disables it for private clusters).
+  # Allow inbound to LoadBalancer / ingress Services landing on the system
+  # pool, only from the configured sources. The Internet service tag is used
+  # only when allow_public_load_balancer is set without a source list.
   dynamic "security_rule" {
-    for_each = length(var.public_load_balancer_ports) > 0 ? [1] : []
+    for_each = length(var.public_load_balancer_ports) > 0 && (length(var.public_load_balancer_allowed_ip_ranges) > 0 || var.allow_public_load_balancer) ? [1] : []
     content {
       name                       = "AllowPublicLoadBalancerInbound"
       priority                   = 4000
@@ -98,7 +97,8 @@ resource "azurerm_network_security_group" "system" {
       protocol                   = "Tcp"
       source_port_range          = "*"
       destination_port_ranges    = var.public_load_balancer_ports
-      source_address_prefix      = "Internet"
+      source_address_prefix      = length(var.public_load_balancer_allowed_ip_ranges) > 0 ? null : "Internet"
+      source_address_prefixes    = length(var.public_load_balancer_allowed_ip_ranges) > 0 ? var.public_load_balancer_allowed_ip_ranges : null
       destination_address_prefix = "*"
     }
   }
