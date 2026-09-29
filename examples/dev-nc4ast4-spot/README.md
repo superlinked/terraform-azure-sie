@@ -23,6 +23,8 @@ Creates a minimal AKS cluster with a single `Standard_NC4as_T4_v3` spot GPU pool
 The Kubernetes API server accepts only the CIDRs you list. Include the
 address the machine running Terraform, kubectl, and Helm uses to reach the
 Internet, because the module installs a Helm release during `terraform apply`.
+The module adds the cluster's NAT gateway egress prefix so nodes can reach
+the API server.
 `203.0.113.10/32` below is a documentation placeholder; replace it with your
 own range.
 

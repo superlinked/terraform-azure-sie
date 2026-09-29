@@ -195,7 +195,7 @@ choose one mode:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `api_server_authorized_ip_ranges` | `[]` | CIDRs allowed to reach the API server. Include every machine that runs `terraform`, `kubectl`, or `helm` against the cluster: the module installs the NVIDIA device plugin Helm release during apply. |
+| `api_server_authorized_ip_ranges` | `[]` | CIDRs allowed to reach the API server. Include every machine that runs `terraform`, `kubectl`, or `helm` against the cluster: the module installs the NVIDIA device plugin Helm release during apply. The module adds the cluster's NAT gateway egress prefix so nodes can reach the API server. |
 | `enable_private_cluster` | `false` | Serve the API server only on a private endpoint in the VNet. Run Terraform, kubectl, and Helm from a network that reaches the VNet. Changing it replaces the cluster. |
 | `allow_public_api_server` | `false` | Explicit opt-in to accept any Internet address on the API server. |
 
@@ -218,8 +218,10 @@ chart README.
 
 - `api_server_authorized_ip_ranges` entries must be CIDR blocks, and ranges
   broader than `/8` or `/16` now need `allow_public_api_server = true`.
-  Configurations that set `allow_public_api_server`, `enable_private_cluster`,
-  or narrower ranges plan without API server changes.
+  Configurations that set `allow_public_api_server` or `enable_private_cluster`
+  without an allowlist plan without API server changes. Configurations with an
+  allowlist see an in-place update that adds the NAT gateway egress prefix to
+  the authorized ranges.
 - The system subnet NSG no longer opens `80`, `443`, and `8080` to the
   Internet by default. The plan shows an in-place update of the system NSG
   that removes the `AllowPublicLoadBalancerInbound` rule. To keep a reachable

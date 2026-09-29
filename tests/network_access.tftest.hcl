@@ -34,6 +34,14 @@ mock_provider "azurerm" {
     }
     override_during = plan
   }
+
+  mock_resource "azurerm_public_ip_prefix" {
+    defaults = {
+      id        = "/subscriptions/00000000-0000-0000-0000-000000000002/resourceGroups/sie-test-rg/providers/Microsoft.Network/publicIPPrefixes/sie-test-nat-pip-prefix"
+      ip_prefix = "198.51.100.16/28"
+    }
+    override_during = plan
+  }
 }
 
 mock_provider "azuread" {}
@@ -97,9 +105,22 @@ run "restricts_api_server_to_allowlist" {
   assert {
     condition = (
       !azurerm_kubernetes_cluster.main.private_cluster_enabled
-      && azurerm_kubernetes_cluster.main.api_server_access_profile[0].authorized_ip_ranges == toset(["203.0.113.10/32"])
+      && azurerm_kubernetes_cluster.main.api_server_access_profile[0].authorized_ip_ranges == toset(["203.0.113.10/32", "198.51.100.16/28"])
     )
-    error_message = "The API server should accept only the allowlisted range"
+    error_message = "The API server should accept only the allowlisted range and the cluster's NAT gateway egress prefix"
+  }
+}
+
+run "opt_in_without_allowlist_adds_no_ranges" {
+  command = plan
+
+  variables {
+    allow_public_api_server = true
+  }
+
+  assert {
+    condition     = length(azurerm_kubernetes_cluster.main.api_server_access_profile[0].authorized_ip_ranges) == 0
+    error_message = "The NAT gateway prefix should be added only alongside an operator allowlist"
   }
 }
 

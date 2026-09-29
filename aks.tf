@@ -71,11 +71,17 @@ resource "azurerm_kubernetes_cluster" "main" {
   }
   local_account_disabled = var.local_account_disabled
 
-  # Private vs. public API endpoint
+  # Private vs. public API endpoint. AKS adds only a Standard load balancer's
+  # outbound IP to the allowlist, so nodes egressing through the NAT gateway
+  # need its prefix listed to reach the API server.
   private_cluster_enabled             = var.enable_private_cluster
   private_cluster_public_fqdn_enabled = false
   api_server_access_profile {
-    authorized_ip_ranges = var.api_server_authorized_ip_ranges
+    authorized_ip_ranges = (
+      length(var.api_server_authorized_ip_ranges) > 0
+      ? concat(var.api_server_authorized_ip_ranges, [azurerm_public_ip_prefix.nat.ip_prefix])
+      : []
+    )
   }
 
   # Identity: control-plane UAMI is created in identity.tf.
