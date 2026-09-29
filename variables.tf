@@ -170,13 +170,18 @@ variable "grant_admin_to_creator" {
 }
 
 variable "api_server_authorized_ip_ranges" {
-  description = "CIDR blocks authorized to reach the AKS API server. Include every machine that runs terraform, kubectl, or helm against the cluster: the module installs a Helm release during apply. An empty list means no IP allowlist (AKS treats this as open), so the plan fails unless enable_private_cluster or allow_public_api_server is set. Ranges broader than /8 (IPv4) or /16 (IPv6), including 0.0.0.0/0, require allow_public_api_server = true."
+  description = "CIDR blocks authorized to reach the AKS API server. Include every machine that runs terraform, kubectl, or helm against the cluster: the module installs a Helm release during apply. The module adds the NAT gateway egress prefix, so at most 199 entries fit the AKS limit of 200. An empty list means no IP allowlist (AKS treats this as open), so the plan fails unless enable_private_cluster or allow_public_api_server is set. Ranges broader than /8 (IPv4) or /16 (IPv6), including 0.0.0.0/0, require allow_public_api_server = true."
   type        = list(string)
   default     = []
 
   validation {
     condition     = alltrue([for cidr in var.api_server_authorized_ip_ranges : can(cidrhost(cidr, 0))])
     error_message = "Each api_server_authorized_ip_ranges entry must be a CIDR block such as 203.0.113.10/32."
+  }
+
+  validation {
+    condition     = length(var.api_server_authorized_ip_ranges) <= 199
+    error_message = "api_server_authorized_ip_ranges accepts at most 199 entries: AKS allows 200 authorized ranges and the module adds the NAT gateway egress prefix."
   }
 
   validation {

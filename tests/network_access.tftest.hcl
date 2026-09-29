@@ -95,6 +95,16 @@ run "rejects_split_any_address_without_opt_in" {
   expect_failures = [var.api_server_authorized_ip_ranges]
 }
 
+run "rejects_allowlist_without_room_for_nat_prefix" {
+  command = plan
+
+  variables {
+    api_server_authorized_ip_ranges = [for i in range(200) : cidrsubnet("100.0.0.0/8", 16, i)]
+  }
+
+  expect_failures = [var.api_server_authorized_ip_ranges]
+}
+
 run "restricts_api_server_to_allowlist" {
   command = plan
 

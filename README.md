@@ -195,7 +195,7 @@ choose one mode:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `api_server_authorized_ip_ranges` | `[]` | CIDRs allowed to reach the API server. Include every machine that runs `terraform`, `kubectl`, or `helm` against the cluster: the module installs the NVIDIA device plugin Helm release during apply. The module adds the cluster's NAT gateway egress prefix so nodes can reach the API server. |
+| `api_server_authorized_ip_ranges` | `[]` | CIDRs allowed to reach the API server. Include every machine that runs `terraform`, `kubectl`, or `helm` against the cluster: the module installs the NVIDIA device plugin Helm release during apply. The module adds the cluster's NAT gateway egress prefix so nodes can reach the API server, so at most 199 entries fit the AKS limit of 200. |
 | `enable_private_cluster` | `false` | Serve the API server only on a private endpoint in the VNet. Run Terraform, kubectl, and Helm from a network that reaches the VNet. Changing it replaces the cluster. |
 | `allow_public_api_server` | `false` | Explicit opt-in to accept any Internet address on the API server. |
 

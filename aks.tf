@@ -79,7 +79,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   api_server_access_profile {
     authorized_ip_ranges = (
       length(var.api_server_authorized_ip_ranges) > 0
-      ? concat(var.api_server_authorized_ip_ranges, [azurerm_public_ip_prefix.nat.ip_prefix])
+      ? distinct(concat(var.api_server_authorized_ip_ranges, [azurerm_public_ip_prefix.nat.ip_prefix]))
       : []
     )
   }
