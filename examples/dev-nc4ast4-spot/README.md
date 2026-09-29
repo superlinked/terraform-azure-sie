@@ -25,8 +25,9 @@ address the machine running Terraform, kubectl, and Helm uses to reach the
 Internet, because the module installs a Helm release during `terraform apply`.
 The module adds the cluster's NAT gateway egress prefix so nodes can reach
 the API server.
-`203.0.113.10/32` below is a documentation placeholder; replace it with your
-own range.
+`203.0.113.10/32` below is a documentation placeholder. The module rejects
+documentation ranges, so replace it with your own address. See the module
+README for the allowlist rules and how to recover if the list excludes you.
 
 ```bash
 az login

@@ -28,7 +28,8 @@ terraform plan
 terraform apply
 ```
 
-`203.0.113.10/32` is a documentation placeholder. See
+`203.0.113.10/32` is a documentation placeholder. The module rejects
+documentation ranges, so replace it with your own address. See
 [Kubernetes API and load balancer access](#kubernetes-api-and-load-balancer-access)
 for the private-cluster mode.
 
@@ -183,7 +184,7 @@ The A10 default uses a fractional GPU. Check the [Microsoft NVadsA10 v5 specific
 | `system_subnet_cidr` | `10.0.0.0/22` | System pool subnet |
 | `gpu_subnet_cidr` | `10.0.4.0/22` | GPU pool subnet |
 | `private_endpoint_subnet_cidr` | `10.0.8.0/24` | Private-endpoint subnet |
-| `create_ingress_public_ip` | `false` | Provision a static public IP for the ingress controller in the cluster RG so DNS survives a cluster destroy/recreate |
+| `create_ingress_public_ip` | `false` | Provision a static public IP for the ingress controller in the cluster RG so DNS survives a cluster destroy/recreate. The ingress stays unreachable until `public_load_balancer_ports` and a source are set. |
 | `deletion_protection` | `true` | Place a CanNotDelete management lock on the AKS cluster (set false for dev) |
 | `automatic_upgrade_channel` | `stable` | AKS auto-upgrade channel (`patch` / `rapid` / `stable` / `node-image` / `none`) |
 
@@ -196,7 +197,7 @@ choose one mode:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `api_server_authorized_ip_ranges` | `[]` | CIDRs allowed to reach the API server. Include every machine that runs `terraform`, `kubectl`, or `helm` against the cluster: the module installs the NVIDIA device plugin Helm release during apply. The module adds the cluster's NAT gateway egress prefix so nodes can reach the API server, so at most 199 entries fit the AKS limit of 200. |
-| `enable_private_cluster` | `false` | Serve the API server only on a private endpoint in the VNet. Run Terraform, kubectl, and Helm from a network that reaches the VNet. Changing it replaces the cluster. |
+| `enable_private_cluster` | `false` | Serve the API server only on a private endpoint in the VNet. Run Terraform, kubectl, and Helm from a network that reaches the VNet. Changing it replaces the cluster. AKS does not support authorized ranges on private clusters, so leave the allowlist empty. |
 | `allow_public_api_server` | `false` | Explicit opt-in to accept any Internet address on the API server. |
 
 Inbound traffic from outside the VNet to Kubernetes `LoadBalancer` or ingress
@@ -208,27 +209,62 @@ Services on the system node subnet is closed by default:
 | `public_load_balancer_allowed_ip_ranges` | `[]` | Source CIDRs allowed to reach those ports. Required when ports are set, unless `allow_public_load_balancer = true`. |
 | `allow_public_load_balancer` | `false` | Explicit opt-in to accept any Internet address on those ports (the NSG `Internet` service tag). |
 
-Ranges broader than `/8` (IPv4) or `/16` (IPv6), including `0.0.0.0/0` and
-`::/0`, are rejected unless the matching `allow_public_*` opt-in is set. The
-chart's gateway and config Services are `ClusterIP` by default, and exposing
-the gateway also needs the authentication and TLS settings described in the
-chart README.
+Rules for `api_server_authorized_ip_ranges` and
+`public_load_balancer_allowed_ip_ranges`:
+
+- Entries must be IPv4 CIDR blocks. IPv6 entries, including IPv4-mapped ranges
+  such as `::ffff:0:0/96`, and service tags such as `Internet` are rejected.
+- Together the entries in each list may cover at most 16,777,216 addresses,
+  the size of one `/8`. `0.0.0.0/0`, split halves such as two `/1` blocks, and
+  several broad ranges are rejected unless the matching `allow_public_*`
+  opt-in is set.
+- Documentation ranges (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`)
+  are rejected, so an unedited placeholder fails at plan time.
+- `api_server_authorized_ip_ranges` takes at most 199 entries, because the
+  module adds the NAT gateway prefix and AKS allows 200.
+
+The chart's gateway and config Services are `ClusterIP` by default, and
+exposing the gateway also needs the authentication and TLS settings described
+in the chart README.
+
+**Recovering from an allowlist that excludes Terraform.** The module refreshes
+its NVIDIA device plugin Helm release on every plan, so a plan fails once the
+machine running Terraform is no longer in the allowlist. Add your address with
+the Azure CLI from any machine with rights on the cluster, keeping the
+existing entries (including the NAT gateway prefix). Then set
+`api_server_authorized_ip_ranges` to match and apply:
+
+```bash
+az aks show -g <resource-group> -n <cluster> \
+  --query apiServerAccessProfile.authorizedIpRanges -o tsv
+az aks update -g <resource-group> -n <cluster> \
+  --api-server-authorized-ip-ranges "<existing-ranges>,<your-cidr>"
+```
+
+Alternatively, correct the variable and run
+`terraform apply -refresh=false -target=azurerm_kubernetes_cluster.main`, which
+updates the authorized ranges without reading the in-cluster resources, then
+run a normal plan.
 
 **Upgrading from 0.x.**
 
-- `api_server_authorized_ip_ranges` entries must be CIDR blocks, and ranges
-  broader than `/8` or `/16` now need `allow_public_api_server = true`.
-  Configurations that set `allow_public_api_server` or `enable_private_cluster`
+- `api_server_authorized_ip_ranges` entries must be IPv4 CIDR blocks outside
+  the documentation ranges, and a list that covers more than one `/8` in total
+  now needs `allow_public_api_server = true`. An allowlist together with
+  `enable_private_cluster = true` is rejected, because AKS does not support it.
+- Configurations that set `allow_public_api_server` or `enable_private_cluster`
   without an allowlist plan without API server changes. Configurations with an
   allowlist see an in-place update that adds the NAT gateway egress prefix to
   the authorized ranges.
 - The system subnet NSG no longer opens `80`, `443`, and `8080` to the
-  Internet by default. The plan shows an in-place update of the system NSG
-  that removes the `AllowPublicLoadBalancerInbound` rule. To keep a reachable
-  ingress, set `public_load_balancer_ports` and
-  `public_load_balancer_allowed_ip_ranges`. To keep the previous rule exactly,
-  set `public_load_balancer_ports = ["80", "443", "8080"]` and
-  `allow_public_load_balancer = true`; the plan then shows no NSG change.
+  Internet by default. For a cluster built with the previous defaults, the
+  plan shows an in-place update of `azurerm_network_security_group.system`
+  that removes the `AllowPublicLoadBalancerInbound` rule.
+  - To keep a reachable ingress, set `public_load_balancer_ports` and
+    `public_load_balancer_allowed_ip_ranges`.
+  - To keep the previous rule exactly, set
+    `public_load_balancer_ports = ["80", "443", "8080"]` and
+    `allow_public_load_balancer = true`.
 
 ### Container registry
 
