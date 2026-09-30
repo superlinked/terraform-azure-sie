@@ -39,12 +39,19 @@ $(terraform output -raw kubectl_config_command)
 # source repo - it wires up KEDA, the t4 machine profile, and the
 # azure.workload.identity/use=true pod label the AKS Workload Identity webhook
 # keys off of. The chart and overlay are pinned to the same SIE release.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.8.3 \
-  -f https://raw.githubusercontent.com/superlinked/sie/v0.8.3/deploy/helm/sie-cluster/values-aks.yaml \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.9.0 \
+  -f https://raw.githubusercontent.com/superlinked/sie/v0.9.0/deploy/helm/sie-cluster/values-aks.yaml \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
 ```
+
+Chart `0.9.0` has breaking changes for existing releases: NATS authentication
+is on by default, the AKS values file no longer enables the gateway Ingress,
+and `helm upgrade --reuse-values` fails to render. Before upgrading a release
+installed from an earlier chart, follow
+[Upgrading to SIE 0.9.0](../../README.md#upgrading-to-sie-090) in the module
+README.
 
 ## Variables
 
