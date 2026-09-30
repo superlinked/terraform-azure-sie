@@ -86,7 +86,8 @@ provider "azurerm" {
 }
 
 module "sie_aks" {
-  source = "../.."
+  source  = "superlinked/sie/azure"
+  version = "0.7.3" # x-release-please-version
 
   location     = var.location
   project_name = var.project_name
