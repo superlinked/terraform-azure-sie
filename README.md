@@ -70,8 +70,9 @@ above:
 - **The AKS values file no longer enables the gateway Ingress.** The upgrade
   removes the host-less, plain-HTTP Ingress that earlier releases created. To
   keep external access, enable the Ingress with gateway authentication and TLS.
-  To keep the previous unauthenticated catch-all Ingress, set both
-  `ingress.allowUnauthenticated=true` and `ingress.allowPlaintext=true`. A
+  To keep the previous unauthenticated catch-all Ingress, set
+  `ingress.enabled=true` together with `ingress.allowUnauthenticated=true` and
+  `ingress.allowPlaintext=true`. A
   `LoadBalancer` or `NodePort` gateway Service needs gateway authentication or
   `gateway.service.allowUnauthenticated=true`, and also
   `gateway.service.allowPlaintext=true`, because the gateway serves plain HTTP.
