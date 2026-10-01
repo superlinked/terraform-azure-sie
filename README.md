@@ -80,8 +80,11 @@ above:
   restarted take no work until they do. To avoid that gap, run the
   command above twice: first with `--set nats.auth.allowAnonymous=true` added,
   then, once every pod has restarted, with `--set nats.auth.allowAnonymous=false`.
-  The first step still restarts NATS, so the two steps do not prevent the loss
-  of queued and in-flight work. See the chart's
+  Between the two steps NATS also accepts anonymous clients, with unrestricted
+  permissions, and the chart ships no NetworkPolicy for the NATS pods, so allow
+  only trusted workloads to reach NATS. The first step still restarts NATS, so
+  the two steps do not prevent the loss of queued and in-flight work. See the
+  chart's
   [NATS authentication section](https://github.com/superlinked/sie/blob/v0.9.0/deploy/helm/sie-cluster/README.md#nats-authentication).
 - **Pass values explicitly.** `helm upgrade --reuse-values` now fails to
   render. Re-run the full command above, which passes the values file with
