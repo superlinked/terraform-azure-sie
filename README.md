@@ -58,6 +58,13 @@ gateway outside the cluster, enable the Ingress together with gateway
 authentication and TLS, as described in the chart's
 [Ingress section](https://github.com/superlinked/sie/blob/v0.9.0/deploy/helm/sie-cluster/README.md#authentication-and-tls-requirements).
 
+To reach the gateway from your machine without an Ingress, forward a local
+port to its `ClusterIP` Service:
+
+```bash
+kubectl -n sie port-forward svc/sie-gateway 8080:8080
+```
+
 ### Upgrading to SIE 0.9.0
 
 Chart `0.9.0` has breaking changes. Read the
@@ -66,11 +73,18 @@ before upgrading an existing release. For a release installed with the command
 above:
 
 - **NATS authentication is on by default.** The upgrade restarts NATS and rolls
-  sie-config, the gateway, and the workers. NATS refuses pods that have not
-  rolled yet, and memory-backed queued work is lost. To avoid the gap, run the
+  sie-config, the gateway, and the workers. With the default memory-backed work
+  queues, queued and in-flight work is lost, as on any NATS restart. A gateway,
+  sie-config, or worker pod that has not been replaced yet has no credentials,
+  and NATS refuses it: requests can fail with `503`, and workers that have not
+  restarted take no work until they do. To avoid that gap, run the
   command above twice: first with `--set nats.auth.allowAnonymous=true` added,
   then, once every pod has restarted, with `--set nats.auth.allowAnonymous=false`.
-  See the chart's
+  Between the two steps NATS also accepts anonymous clients, with unrestricted
+  permissions, and the chart ships no NetworkPolicy for the NATS pods, so allow
+  only trusted workloads to reach NATS. The first step still restarts NATS, so
+  the two steps do not prevent the loss of queued and in-flight work. See the
+  chart's
   [NATS authentication section](https://github.com/superlinked/sie/blob/v0.9.0/deploy/helm/sie-cluster/README.md#nats-authentication).
 - **Pass values explicitly.** `helm upgrade --reuse-values` now fails to
   render. Re-run the full command above, which passes the values file with
@@ -85,10 +99,19 @@ above:
   `gateway.service.allowUnauthenticated=true`, and also
   `gateway.service.allowPlaintext=true`, because the gateway serves plain HTTP.
 - **sie-config tokens are split.** The upgrade generates a sie-config admin
-  token (Secret `sie-config-admin-token`) and a separate read token for the
-  gateway and the worker sidecars. sie-config then requires a token on every
-  `/v1/configs` request, so give the admin token to tooling that writes model
-  configs. The gateway no longer receives that admin token: with gateway
+  token and a separate read token for the gateway and the worker sidecars.
+  The AKS values file sets `fullnameOverride: sie`, so the Secrets are
+  `sie-config-admin-token` and `sie-config-read-token`, not the
+  `sie-cluster-config-*` names in the chart's examples. sie-config then
+  requires a token on every `/v1/configs` request, so give the admin token to
+  tooling that writes model configs. Read it with:
+
+  ```bash
+  kubectl get secret -n sie sie-config-admin-token \
+    -o jsonpath='{.data.SIE_ADMIN_TOKEN}' | base64 -d
+  ```
+
+  The gateway no longer receives that admin token: with gateway
   authentication enabled, its admin routes (`POST`, `PUT`, and `DELETE` under
   `/v1/pools`, `/v1/admin`, and `/v1/configs`) answer `403` until
   `gateway.auth.adminTokenSecretName` names a separate Secret. Run the
