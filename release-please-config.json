@@ -8,6 +8,10 @@
       "include-v-in-release-name": true,
       "exclude-paths": [
         ".github"
+      ],
+      "extra-files": [
+        "examples/dev-nc4ast4-spot/main.tf",
+        "examples/dev-nv6adsa10-spot/main.tf"
       ]
     }
   }

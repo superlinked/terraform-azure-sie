@@ -170,21 +170,107 @@ variable "grant_admin_to_creator" {
 }
 
 variable "api_server_authorized_ip_ranges" {
-  description = "CIDR blocks authorized to reach the AKS API server. Empty list means no IP allowlist (AKS treats this as open). Combine with enable_private_cluster or allow_public_api_server."
+  description = "IPv4 CIDR blocks authorized to reach the AKS API server. Include every machine that runs terraform, kubectl, or helm against the cluster: the module installs a Helm release during apply. The module adds the NAT gateway egress prefix, so at most 199 entries fit the AKS limit of 200. An empty list means no IP allowlist (AKS treats this as open), so the plan fails unless enable_private_cluster or allow_public_api_server is set. AKS does not support authorized ranges on private clusters, so leave this empty with enable_private_cluster. Together the ranges may cover at most 16,777,216 addresses (one /8) unless allow_public_api_server = true. Entries inside a documentation range (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24) are rejected, and broader entries that contain one need allow_public_api_server = true."
   type        = list(string)
   default     = []
+  nullable    = false
+
+  validation {
+    condition     = alltrue([for cidr in var.api_server_authorized_ip_ranges : can(cidrhost(cidr, 0)) && !strcontains(cidr, ":")])
+    error_message = "Each api_server_authorized_ip_ranges entry must be an IPv4 CIDR block (an address with a prefix length, such as <egress-address>/32)."
+  }
+
+  validation {
+    condition     = length(var.api_server_authorized_ip_ranges) <= 199
+    error_message = "api_server_authorized_ip_ranges accepts at most 199 entries: AKS allows 200 authorized ranges and the module adds the NAT gateway egress prefix."
+  }
+
+  validation {
+    condition = alltrue([
+      for cidr in var.api_server_authorized_ip_ranges : !try(
+        (tonumber(split("/", cidr)[1]) >= 24 || !var.allow_public_api_server)
+        && anytrue([
+          for doc in ["192.0.2.0", "198.51.100.0", "203.0.113.0"] :
+          cidrhost("${cidrhost(cidr, 0)}/${min(tonumber(split("/", cidr)[1]), 24)}", 0) == cidrhost("${doc}/${min(tonumber(split("/", cidr)[1]), 24)}", 0)
+        ]),
+        false
+      )
+    ])
+    error_message = "api_server_authorized_ip_ranges overlaps a documentation range (192.0.2.0/24, 198.51.100.0/24, or 203.0.113.0/24), such as the README placeholder. Replace it with the real egress address of the machines that need API access. A broader range that contains a documentation range needs allow_public_api_server = true."
+  }
+
+  validation {
+    condition = var.allow_public_api_server || try(
+      sum(concat([0], [for cidr in var.api_server_authorized_ip_ranges : pow(2, 32 - tonumber(split("/", cidr)[1]))])) <= pow(2, 24),
+      false
+    )
+    error_message = "api_server_authorized_ip_ranges covers more than 16,777,216 addresses (one /8) in total, for example 0.0.0.0/0 or several broad ranges. List the specific ranges that need API access, or set allow_public_api_server = true to accept any Internet address."
+  }
+
+  validation {
+    condition     = !(var.enable_private_cluster && length(var.api_server_authorized_ip_ranges) > 0)
+    error_message = "AKS does not support API server authorized IP ranges on private clusters. Leave api_server_authorized_ip_ranges empty when enable_private_cluster = true."
+  }
 }
 
 variable "allow_public_api_server" {
-  description = "Escape hatch to allow a publicly reachable AKS API server (no IP allowlist, no private cluster). Default false so the module fails the plan if neither enable_private_cluster nor api_server_authorized_ip_ranges is set. Flip to true only for short-lived dev clusters."
+  description = "Opt in to an AKS API server that accepts any Internet address: with no IP allowlist and no private cluster the API server is open, and api_server_authorized_ip_ranges may cover more than one /8 in total. Default false so the module fails the plan if neither enable_private_cluster nor api_server_authorized_ip_ranges is set."
   type        = bool
   default     = false
+  nullable    = false
 }
 
 variable "public_load_balancer_ports" {
-  description = "Inbound TCP ports allowed from the Internet to the system node subnet for Kubernetes LoadBalancer / ingress Services. The module's subnet NSG must allow these or its default DenyAllInBound drops the traffic: AKS programs LoadBalancer rules only on its own NIC-level NSG, not a user-managed subnet NSG. Defaults cover ingress-nginx (80/443) and a directly-exposed gateway LoadBalancer on 8080. Set to [] for private clusters that take no public inbound."
+  description = "Inbound TCP ports to open on the system node subnet for Kubernetes LoadBalancer / ingress Services, such as [\"443\"] for an ingress controller. The module's subnet NSG must allow these or its default DenyAllInBound drops the traffic: AKS programs LoadBalancer rules only on its own NIC-level NSG, not a user-managed subnet NSG. Default [] takes no inbound traffic from outside the VNet. Non-empty ports need public_load_balancer_allowed_ip_ranges or allow_public_load_balancer. The module owns every rule on the system subnet NSG, so rules added to it outside the module are removed on the next apply."
   type        = list(string)
-  default     = ["80", "443", "8080"]
+  default     = []
+  nullable    = false
+
+  validation {
+    condition     = length(var.public_load_balancer_ports) == 0 || length(var.public_load_balancer_allowed_ip_ranges) > 0 || var.allow_public_load_balancer
+    error_message = "public_load_balancer_ports needs a source: set public_load_balancer_allowed_ip_ranges to the client CIDRs that may connect, or set allow_public_load_balancer = true to accept any Internet address."
+  }
+}
+
+variable "public_load_balancer_allowed_ip_ranges" {
+  description = "Source IPv4 CIDR blocks allowed to reach public_load_balancer_ports on the system node subnet. Together the ranges may cover at most 16,777,216 addresses (one /8) unless allow_public_load_balancer = true. Entries inside a documentation range (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24) are rejected, and broader entries that contain one need allow_public_load_balancer = true."
+  type        = list(string)
+  default     = []
+  nullable    = false
+
+  validation {
+    condition     = alltrue([for cidr in var.public_load_balancer_allowed_ip_ranges : can(cidrhost(cidr, 0)) && !strcontains(cidr, ":")])
+    error_message = "Each public_load_balancer_allowed_ip_ranges entry must be an IPv4 CIDR block (an address with a prefix length, such as <client-network>/24)."
+  }
+
+  validation {
+    condition = alltrue([
+      for cidr in var.public_load_balancer_allowed_ip_ranges : !try(
+        (tonumber(split("/", cidr)[1]) >= 24 || !var.allow_public_load_balancer)
+        && anytrue([
+          for doc in ["192.0.2.0", "198.51.100.0", "203.0.113.0"] :
+          cidrhost("${cidrhost(cidr, 0)}/${min(tonumber(split("/", cidr)[1]), 24)}", 0) == cidrhost("${doc}/${min(tonumber(split("/", cidr)[1]), 24)}", 0)
+        ]),
+        false
+      )
+    ])
+    error_message = "public_load_balancer_allowed_ip_ranges overlaps a documentation range (192.0.2.0/24, 198.51.100.0/24, or 203.0.113.0/24). Replace it with the real client ranges. A broader range that contains a documentation range needs allow_public_load_balancer = true."
+  }
+
+  validation {
+    condition = var.allow_public_load_balancer || try(
+      sum(concat([0], [for cidr in var.public_load_balancer_allowed_ip_ranges : pow(2, 32 - tonumber(split("/", cidr)[1]))])) <= pow(2, 24),
+      false
+    )
+    error_message = "public_load_balancer_allowed_ip_ranges covers more than 16,777,216 addresses (one /8) in total, for example 0.0.0.0/0 or several broad ranges. List the client ranges, or set allow_public_load_balancer = true to accept any Internet address."
+  }
+}
+
+variable "allow_public_load_balancer" {
+  description = "Opt in to accepting any Internet address on public_load_balancer_ports. With an empty public_load_balancer_allowed_ip_ranges the NSG rule's source is the Internet service tag, and the source list may cover more than one /8 in total."
+  type        = bool
+  default     = false
+  nullable    = false
 }
 
 variable "system_node_pool" {
@@ -524,7 +610,9 @@ variable "create_ingress_public_ip" {
     and can be pre-pointed in DNS. Pass the IP into the ingress-nginx Helm
     chart via the `ingress_public_ip` / `ingress_helm_args` outputs. Default
     false to match the module's other `create_*` opt-ins; flip to true for
-    clusters with stable DNS.
+    clusters with stable DNS. The system subnet NSG admits no inbound traffic
+    from outside the VNet by default, so also set public_load_balancer_ports
+    and a source, or the ingress stays unreachable.
   EOT
   type        = bool
   default     = false

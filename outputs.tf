@@ -158,7 +158,7 @@ output "gpu_node_pool_disk_sizes_gb" {
 # =============================================================================
 
 output "ingress_public_ip" {
-  description = "Static public IP address for the ingress controller. Null when create_ingress_public_ip = false."
+  description = "Static public IP address for the ingress controller. Null when create_ingress_public_ip = false. The system subnet NSG admits no inbound traffic from outside the VNet by default, so the ingress is unreachable until public_load_balancer_ports and a source (public_load_balancer_allowed_ip_ranges or allow_public_load_balancer) are set."
   value       = try(azurerm_public_ip.ingress[0].ip_address, null)
 }
 

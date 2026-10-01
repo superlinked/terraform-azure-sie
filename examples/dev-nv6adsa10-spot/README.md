@@ -6,7 +6,7 @@ Creates a minimal AKS cluster with a single `Standard_NV6ads_A10_v5` spot GPU po
 
 | Resource | Configuration |
 |----------|---------------|
-| AKS cluster | Public API endpoint, AAD-RBAC, Workload Identity + OIDC issuer, Kubernetes default version |
+| AKS cluster | API endpoint restricted to `api_server_authorized_ip_ranges`, AAD-RBAC, Workload Identity + OIDC issuer, Kubernetes default version |
 | GPU node pool | 1/6 NVIDIA A10 with 4 GB per node (Standard_NV6ads_A10_v5), spot, scale 0-5 |
 | System node pool | Standard_B4ms (system workloads - burstable 4 vCPU / 16 GiB), scale 1-5 across zones 1/2/3 |
 | VNet | Single VNet, three subnets (system, GPU, private-endpoint), Cilium network policy |
@@ -30,9 +30,20 @@ The CPU and memory resource limits in `values-sie.yaml` describe host resources;
 
 ## Usage
 
+The Kubernetes API server accepts only the CIDRs you list. Include the
+address the machine running Terraform, kubectl, and Helm uses to reach the
+Internet, because the module installs a Helm release during `terraform apply`.
+The module adds the cluster's NAT gateway egress prefix so nodes can reach
+the API server.
+`203.0.113.10/32` below is a documentation placeholder. The module rejects
+documentation ranges, so replace it with your own address. See the module
+README for the allowlist rules and how to recover if the list excludes you.
+
 ```bash
 az login
 az account set --subscription "<subscription_id>"
+curl -s https://checkip.amazonaws.com   # your egress address; append /32
+export TF_VAR_api_server_authorized_ip_ranges='["203.0.113.10/32"]'
 terraform init
 terraform plan
 terraform apply
@@ -70,6 +81,7 @@ README, running the command above with `-f values-sie.yaml` in each step.
 |----------|---------|-------------|
 | `location` | `westeurope` | Azure region |
 | `project_name` | `sie-dev` | Name prefix for all resources |
+| `api_server_authorized_ip_ranges` | _(required)_ | CIDRs allowed to reach the Kubernetes API, such as `["203.0.113.10/32"]` |
 
 ## Outputs
 

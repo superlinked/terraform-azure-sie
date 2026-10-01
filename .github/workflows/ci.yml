@@ -53,3 +53,30 @@ jobs:
 
       - name: Validate Terraform
         run: terraform validate -no-color
+
+      - name: Run network access tests
+        run: terraform test -filter=tests/network_access.tftest.hcl -no-color
+
+      - name: Point the examples at the module source in this pull request
+        run: |
+          for file in examples/dev-nc4ast4-spot/main.tf examples/dev-nv6adsa10-spot/main.tf; do
+            sed -i -E \
+              -e 's#^([[:space:]]*source[[:space:]]*=[[:space:]]*)"superlinked/sie/azure"#\1"../.."#' \
+              -e '/x-release-please-version/d' \
+              "$file"
+            if ! grep -Eq '^[[:space:]]*source[[:space:]]*=[[:space:]]*"\.\./\.\."' "$file" \
+              || grep -Eq '"superlinked/sie/azure"|x-release-please-version' "$file"; then
+              echo "::error file=$file::could not point the example at the local module source"
+              exit 1
+            fi
+          done
+
+      - name: Initialize Terraform examples
+        run: |
+          terraform -chdir=examples/dev-nc4ast4-spot init -backend=false -input=false -no-color
+          terraform -chdir=examples/dev-nv6adsa10-spot init -backend=false -input=false -no-color
+
+      - name: Validate Terraform examples
+        run: |
+          terraform -chdir=examples/dev-nc4ast4-spot validate -no-color
+          terraform -chdir=examples/dev-nv6adsa10-spot validate -no-color

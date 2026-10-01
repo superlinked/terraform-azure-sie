@@ -73,10 +73,10 @@ resource "azurerm_subnet" "private_endpoints" {
 # =============================================================================
 # AKS recommends NSGs be applied at the subnet level (not the NIC). The
 # default inbound deny + intra-VNet allow covers the GPU/worker subnet; the
-# system subnet additionally opens the public LoadBalancer / ingress ports,
-# because AKS programs those allow-rules only on its own NIC-level NSG, so a
-# user-managed subnet NSG would otherwise drop inbound to any internet-facing
-# Service. Outbound goes through the NAT gateway below.
+# system subnet can additionally open LoadBalancer / ingress ports, because AKS
+# programs those allow-rules only on its own NIC-level NSG, so a user-managed
+# subnet NSG would otherwise drop inbound to any internet-facing Service.
+# Outbound goes through the NAT gateway below.
 
 resource "azurerm_network_security_group" "system" {
   name                = local.names.nsg_system
@@ -84,24 +84,29 @@ resource "azurerm_network_security_group" "system" {
   location            = azurerm_resource_group.main.location
   tags                = local.resource_tags
 
-  # Allow inbound to public LoadBalancer / ingress Services landing on the
-  # system pool. Without this, the default DenyAllInBound silently blocks the
-  # gateway LoadBalancer and ingress-nginx. Gated by var.public_load_balancer_ports
-  # ([] disables it for private clusters).
-  dynamic "security_rule" {
-    for_each = length(var.public_load_balancer_ports) > 0 ? [1] : []
-    content {
-      name                       = "AllowPublicLoadBalancerInbound"
-      priority                   = 4000
-      direction                  = "Inbound"
-      access                     = "Allow"
-      protocol                   = "Tcp"
-      source_port_range          = "*"
-      destination_port_ranges    = var.public_load_balancer_ports
-      source_address_prefix      = "Internet"
-      destination_address_prefix = "*"
-    }
-  }
+  # Allow inbound to LoadBalancer / ingress Services landing on the system
+  # pool, only from the configured sources. The Internet service tag is used
+  # only when allow_public_load_balancer is set without a source list.
+  # security_rule is optional and computed, so it is set as an attribute: an
+  # explicit [] removes existing rules, while omitting it would keep them.
+  security_rule = length(var.public_load_balancer_ports) > 0 && (length(var.public_load_balancer_allowed_ip_ranges) > 0 || var.allow_public_load_balancer) ? [{
+    name                                       = "AllowPublicLoadBalancerInbound"
+    description                                = ""
+    priority                                   = 4000
+    direction                                  = "Inbound"
+    access                                     = "Allow"
+    protocol                                   = "Tcp"
+    source_port_range                          = "*"
+    source_port_ranges                         = []
+    destination_port_range                     = ""
+    destination_port_ranges                    = var.public_load_balancer_ports
+    source_address_prefix                      = length(var.public_load_balancer_allowed_ip_ranges) > 0 ? "" : "Internet"
+    source_address_prefixes                    = var.public_load_balancer_allowed_ip_ranges
+    destination_address_prefix                 = "*"
+    destination_address_prefixes               = []
+    source_application_security_group_ids      = []
+    destination_application_security_group_ids = []
+  }] : []
 }
 
 resource "azurerm_network_security_group" "gpu" {
