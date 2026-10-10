@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/superlinked/terraform-azure-sie/compare/v1.0.0...v1.0.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* pin AKS deployment examples to SIE 0.10.0 ([#9](https://github.com/superlinked/terraform-azure-sie/issues/9)) ([df6eb94](https://github.com/superlinked/terraform-azure-sie/commit/df6eb94d5d84fffda1b469c6c9dad84618dd2e34))
+
 ## [1.0.0](https://github.com/superlinked/terraform-azure-sie/compare/v0.7.3...v1.0.0) (2026-10-01)
 
 
