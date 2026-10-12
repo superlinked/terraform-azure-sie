@@ -1,4 +1,4 @@
-# Apply after the SIE v0.10.0 values-aks.yaml overlay.
+# Apply after values-aks.yaml from the selected SIE chart.
 workers:
   pools:
     t4:

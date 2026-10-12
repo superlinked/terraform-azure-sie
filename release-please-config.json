@@ -7,7 +7,11 @@
       "include-v-in-tag": true,
       "include-v-in-release-name": true,
       "exclude-paths": [
-        ".github"
+        ".github",
+        "docs",
+        "examples",
+        "tests",
+        "scripts"
       ],
       "extra-files": [
         "examples/dev-nc4ast4-spot/main.tf",

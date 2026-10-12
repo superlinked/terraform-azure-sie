@@ -41,24 +41,31 @@ terraform apply
 
 After apply, deploy SIE via Helm:
 
+`helm pull` below selects the latest stable chart once. For production or an
+upgrade, add `--version <reviewed-chart-version>` to that command after
+replacing the placeholder. The Terraform module and SIE runtime versions are
+independent. Keep the extracted directory and record its chart metadata; its
+bundled README and values describe the selected release.
+
 ```bash
+set -euo pipefail
 # Configure kubectl
 $(terraform output -raw kubectl_config_command)
 
-# Install SIE (gateway, sie-config, workers, KEDA, Prometheus, Grafana). The
-# -f flag pulls the AKS overlay (values-aks.yaml) directly from the chart's
-# source repo - it wires up KEDA, the t4 machine profile, and the
-# azure.workload.identity/use=true pod label the AKS Workload Identity webhook
-# keys off of. The chart and overlay are pinned to the same SIE release.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.10.0 \
-  -f https://raw.githubusercontent.com/superlinked/sie/v0.10.0/deploy/helm/sie-cluster/values-aks.yaml \
+SIE_CHART_ROOT="$(mktemp -d)"
+helm pull oci://ghcr.io/superlinked/charts/sie-cluster \
+  --untar --untardir "$SIE_CHART_ROOT"
+SIE_CHART_DIR="$SIE_CHART_ROOT/sie-cluster"
+helm show chart "$SIE_CHART_DIR"
+helm upgrade --install sie-cluster "$SIE_CHART_DIR" \
+  -f "$SIE_CHART_DIR/values-aks.yaml" \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
 ```
 
 Before upgrading a release installed from an earlier chart, follow
-[Upgrading to SIE 0.10.0](../../README.md#upgrading-to-sie-0100) in the module
+[Upgrading SIE](../../README.md#upgrading-sie) in the module
 README. Chart `0.9.0` had breaking changes for existing releases: NATS
 authentication is on by default, the AKS values file no longer enables the
 gateway Ingress, and `helm upgrade --reuse-values` fails to render. A release

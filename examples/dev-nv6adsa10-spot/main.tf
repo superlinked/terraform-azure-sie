@@ -8,12 +8,19 @@
 #
 # Terraform = cloud infra only. K8s resources deployed via Helm:
 #
+#   set -euo pipefail
 #   $(terraform output -raw kubectl_config_command)
 #   # Populate the model cache (only if create_model_cache=true):
 #   sie-admin cache populate --bundle default \
 #     --target $(terraform output -raw model_cache_bucket_url)/
-#   helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.10.0 \
-#     -f https://raw.githubusercontent.com/superlinked/sie/v0.10.0/deploy/helm/sie-cluster/values-aks.yaml \
+#   # For a controlled upgrade, add --version with a reviewed chart version.
+#   SIE_CHART_ROOT="$(mktemp -d)"
+#   helm pull oci://ghcr.io/superlinked/charts/sie-cluster \
+#     --untar --untardir "$SIE_CHART_ROOT"
+#   SIE_CHART_DIR="$SIE_CHART_ROOT/sie-cluster"
+#   helm show chart "$SIE_CHART_DIR"
+#   helm upgrade --install sie-cluster "$SIE_CHART_DIR" \
+#     -f "$SIE_CHART_DIR/values-aks.yaml" \
 #     -f values-sie.yaml \
 #     --namespace sie --create-namespace \
 #     --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
