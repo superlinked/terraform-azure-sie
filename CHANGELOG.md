@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2](https://github.com/superlinked/terraform-azure-sie/compare/v1.0.1...v1.0.2) (2026-10-12)
+
+
+### Documentation
+
+* decouple SIE installation guides from module releases ([#11](https://github.com/superlinked/terraform-azure-sie/issues/11)) ([25f1126](https://github.com/superlinked/terraform-azure-sie/commit/25f1126c8c56b480f827ee19f4cb4fbc27fb8a1c))
+* simplify Helm installs to direct OCI ([c2e55eb](https://github.com/superlinked/terraform-azure-sie/commit/c2e55ebff3f4920178299d578ed3cab963113748))
+
 ## [1.0.1](https://github.com/superlinked/terraform-azure-sie/compare/v1.0.0...v1.0.1) (2026-10-10)
 
 
