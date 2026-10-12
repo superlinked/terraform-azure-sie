@@ -33,30 +33,52 @@ documentation ranges, so replace it with your own address. See
 [Kubernetes API and load balancer access](#kubernetes-api-and-load-balancer-access)
 for the private-cluster mode.
 
-After apply, configure kubectl and deploy SIE via Helm:
+After apply, configure kubectl and select the latest stable SIE chart once.
+The Terraform module and SIE runtime are versioned independently: a new SIE
+release does not require a new Terraform module release. For production or an
+upgrade, add `--version <reviewed-chart-version>` to `helm pull` below, replacing
+the placeholder with the chart version you reviewed. Do not use `--version latest`.
 
 ```bash
+set -euo pipefail
 # Point kubectl at the new cluster
 $(terraform output -raw kubectl_config_command)
 
-# Deploy SIE (gateway, workers, KEDA, Prometheus, Grafana). The -f flag pulls
-# the AKS overlay (values-aks.yaml) directly from the chart's source repo -
-# it wires up KEDA, the t4 + a10 machine profiles, and the
-# azure.workload.identity/use=true pod label the AKS Workload Identity webhook
-# keys off of. The chart and overlay are pinned to the same SIE release.
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.10.0 \
-  -f https://raw.githubusercontent.com/superlinked/sie/v0.10.0/deploy/helm/sie-cluster/values-aks.yaml \
+SIE_CHART_ROOT="$(mktemp -d)"
+helm pull oci://ghcr.io/superlinked/charts/sie-cluster \
+  --untar --untardir "$SIE_CHART_ROOT"
+SIE_CHART_DIR="$SIE_CHART_ROOT/sie-cluster"
+helm show chart "$SIE_CHART_DIR"
+```
+
+Keep this directory and record its `Chart.yaml` metadata. Its bundled README
+and values describe the selected artifact; the
+[chart documentation](https://github.com/superlinked/sie/blob/main/deploy/helm/sie-cluster/README.md)
+on `main` describes ongoing development. If using ACR, follow
+[Pushing images to ACR](#pushing-images-to-acr) now, before installing, and reuse
+this same chart directory. Do not resolve latest a second time for installation.
+
+In the same shell, install the selected local chart with its bundled AKS
+overlay. The overlay configures KEDA, the T4 and A10 machine profiles, and the
+`azure.workload.identity/use=true` pod label required by AKS Workload Identity:
+
+```bash
+set -euo pipefail
+: "${SIE_CHART_DIR:?Select the chart above before installing}"
+helm upgrade --install sie-cluster "$SIE_CHART_DIR" \
+  -f "$SIE_CHART_DIR/values-aks.yaml" \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
 ```
 
-The chart selects the SIE `v0.10.0` images through its `appVersion`. The Terraform module release is versioned independently.
+The chart selects matching, versioned SIE images through its `appVersion`;
+neither the chart installation nor its container images use a moving `latest` tag.
 
 This creates no Ingress: the gateway Service is `ClusterIP`. To expose the
 gateway outside the cluster, enable the Ingress together with gateway
 authentication and TLS, as described in the chart's
-[Ingress section](https://github.com/superlinked/sie/blob/v0.10.0/deploy/helm/sie-cluster/README.md#authentication-and-tls-requirements).
+[Ingress section](https://github.com/superlinked/sie/blob/main/deploy/helm/sie-cluster/README.md#authentication-and-tls-requirements).
 
 To reach the gateway from your machine without an Ingress, forward a local
 port to its `ClusterIP` Service:
@@ -65,10 +87,22 @@ port to its `ClusterIP` Service:
 kubectl -n sie port-forward svc/sie-gateway 8080:8080
 ```
 
+### Upgrading SIE
+
+Review the [SIE release notes](https://github.com/superlinked/sie/releases) for
+every version between the installed release and your selected chart. Pull that
+reviewed version into a fresh directory as above, then use the same artifact
+for image mirroring and installation. Preserve all explicit values, repository
+overrides, authentication, TLS, identity, storage settings, and local overlays
+from the existing installation. Do not blindly re-run the latest-selection
+step for a production upgrade. The historical migration notices below still
+apply when crossing those versions.
+
 ### Upgrading to SIE 0.10.0
 
 Chart `0.10.0` requires no new values, and the AKS values file is unchanged
-from `0.9.0`. To upgrade a `0.9.0` release, re-run the command above. The
+from `0.9.0`. For that specific historical upgrade, select chart `0.10.0`
+with `helm pull --version 0.10.0`, then install the selected local artifact. The
 [SIE 0.10.0 release notes](https://github.com/superlinked/sie/releases/tag/v0.10.0)
 list one breaking change, in the server: a LoRA whose PEFT config sets `bias`
 to `"all"` or `"lora_only"` no longer loads. A model profile that declares one
@@ -92,14 +126,15 @@ above:
   sie-config, or worker pod that has not been replaced yet has no credentials,
   and NATS refuses it: requests can fail with `503`, and workers that have not
   restarted take no work until they do. To avoid that gap, run the
-  command above twice: first with `--set nats.auth.allowAnonymous=true` added,
+  `helm upgrade` command above twice, using the same selected chart: first
+  with `--set nats.auth.allowAnonymous=true` added,
   then, once every pod has restarted, with `--set nats.auth.allowAnonymous=false`.
   Between the two steps NATS also accepts anonymous clients, with unrestricted
   permissions, and the chart ships no NetworkPolicy for the NATS pods, so allow
   only trusted workloads to reach NATS. The first step still restarts NATS, so
   the two steps do not prevent the loss of queued and in-flight work. See the
   chart's
-  [NATS authentication section](https://github.com/superlinked/sie/blob/v0.10.0/deploy/helm/sie-cluster/README.md#nats-authentication).
+  [NATS authentication section](https://github.com/superlinked/sie/blob/main/deploy/helm/sie-cluster/README.md#nats-authentication).
 - **Pass values explicitly.** `helm upgrade --reuse-values` now fails to
   render. Re-run the full command above, which passes the values file with
   `-f`, or use `--reset-then-reuse-values` (Helm 3.14 or later).
@@ -131,7 +166,7 @@ above:
   `gateway.auth.adminTokenSecretName` names a separate Secret. Run the
   sie-config, gateway, and worker sidecar images of the same release. See the
   chart's
-  [sie-config tokens section](https://github.com/superlinked/sie/blob/v0.10.0/deploy/helm/sie-cluster/README.md#sie-config-tokens).
+  [sie-config tokens section](https://github.com/superlinked/sie/blob/main/deploy/helm/sie-cluster/README.md#sie-config-tokens).
 
 For existing installations with custom model profiles, also review the
 [SIE 0.8.0 breaking changes](https://github.com/superlinked/sie/releases/tag/v0.8.0)
@@ -437,27 +472,44 @@ After `terraform apply`, use these outputs to connect and deploy:
 
 Requires `create_acr = true` (or an ACR managed by another stack - see `acr_repository_prefix`).
 
-After `terraform apply`, mirror the published SIE 0.10.0 images. The AKS overlay enables the `default` CUDA 12 worker bundle. When upgrading, mirror the `v0.10.0` images before running `helm upgrade`: sie-config, the gateway, and the worker sidecars must run the same release:
+After selecting the chart in [Quick start](#quick-start), mirror images from
+that artifact's `appVersion` before running `helm upgrade`. Keep the same shell
+and `SIE_CHART_DIR`; do not pull another chart for this step. The AKS overlay
+enables the `default` CUDA 12 worker bundle. sie-config, the gateway, and the
+worker sidecars must run the same release. For custom tags or digests, mirror
+the actual images selected by your values instead of assuming these defaults.
 
 ```bash
+set -euo pipefail
+: "${SIE_CHART_DIR:?Select the chart in Quick start before mirroring}"
+SIE_IMAGE_TAG="$(helm show chart "$SIE_CHART_DIR" | awk '$1 == "appVersion:" {gsub(/["\047]/, "", $2); print $2}')"
+: "${SIE_IMAGE_TAG:?Selected chart must declare a nonempty appVersion}"
+
 # Authenticate Docker to ACR
-az acr login --name $(terraform output -raw acr_name)
+az acr login --name "$(terraform output -raw acr_name)"
 
 # Mirror the default CUDA 12 worker image
-docker pull --platform linux/amd64 ghcr.io/superlinked/sie-server:v0.10.0-cuda12-default
-docker tag ghcr.io/superlinked/sie-server:v0.10.0-cuda12-default "$(terraform output -raw acr_server_repository_url):v0.10.0-cuda12-default"
-docker push "$(terraform output -raw acr_server_repository_url):v0.10.0-cuda12-default"
+docker pull --platform linux/amd64 "ghcr.io/superlinked/sie-server:${SIE_IMAGE_TAG}-cuda12-default"
+docker tag "ghcr.io/superlinked/sie-server:${SIE_IMAGE_TAG}-cuda12-default" "$(terraform output -raw acr_server_repository_url):${SIE_IMAGE_TAG}-cuda12-default"
+docker push "$(terraform output -raw acr_server_repository_url):${SIE_IMAGE_TAG}-cuda12-default"
 
 # Mirror gateway and config images
-docker pull --platform linux/amd64 ghcr.io/superlinked/sie-gateway:v0.10.0
-docker tag ghcr.io/superlinked/sie-gateway:v0.10.0 "$(terraform output -raw acr_gateway_repository_url):v0.10.0"
-docker push "$(terraform output -raw acr_gateway_repository_url):v0.10.0"
-docker pull --platform linux/amd64 ghcr.io/superlinked/sie-config:v0.10.0
-docker tag ghcr.io/superlinked/sie-config:v0.10.0 "$(terraform output -raw acr_config_repository_url):v0.10.0"
-docker push "$(terraform output -raw acr_config_repository_url):v0.10.0"
+docker pull --platform linux/amd64 "ghcr.io/superlinked/sie-gateway:${SIE_IMAGE_TAG}"
+docker tag "ghcr.io/superlinked/sie-gateway:${SIE_IMAGE_TAG}" "$(terraform output -raw acr_gateway_repository_url):${SIE_IMAGE_TAG}"
+docker push "$(terraform output -raw acr_gateway_repository_url):${SIE_IMAGE_TAG}"
+docker pull --platform linux/amd64 "ghcr.io/superlinked/sie-config:${SIE_IMAGE_TAG}"
+docker tag "ghcr.io/superlinked/sie-config:${SIE_IMAGE_TAG}" "$(terraform output -raw acr_config_repository_url):${SIE_IMAGE_TAG}"
+docker push "$(terraform output -raw acr_config_repository_url):${SIE_IMAGE_TAG}"
 ```
 
-When using these ACR repositories, set `workers.common.image.repository`, `gateway.image.repository`, and `config.image.repository` to the matching Terraform outputs. Leave their tag values unset so chart 0.10.0 selects the versioned tags above. The worker sidecar continues to use its published GHCR image; mirror any additional worker bundles or services before overriding their repositories.
+When using these ACR repositories, set `workers.common.image.repository`,
+`gateway.image.repository`, and `config.image.repository` to the matching
+Terraform outputs on the `helm upgrade` command, still using `"$SIE_CHART_DIR"`
+and its bundled values. Leave their tag values unset so the selected chart
+uses the versioned tags above. `appVersion` already contains the `v` prefix;
+do not add another one. The worker sidecar continues to use its published GHCR
+image; mirror any additional worker bundles or services before overriding
+their repositories.
 
 ## Model cache and payload store
 
@@ -473,14 +525,12 @@ Because the payload store is required for >1 MiB work items, the shared blob con
 3. Optional CMEK via `model_cache_kms_key_id` (Key Vault key resource ID).
 4. Locks the storage account's network ACL to `Deny` by default and allows only the cluster's system + GPU subnets (via the `Microsoft.Storage` service endpoint). Operators populating the cache from outside the VNet (e.g. running `sie-admin cache populate` from a laptop or CI runner) must add their egress IP to `storage_allowed_ip_ranges`. To allow additional subnets (e.g. a bastion), set `storage_allowed_subnet_ids` to an explicit list. Both knobs are ignored when `enable_private_endpoints = true` (private link disables the public path entirely).
 
-After apply, pass the cache URL into Helm with one terraform output:
+The [Quick start](#quick-start) installation already passes the cache arguments
+and Workload Identity annotation to the selected local chart. Inspect the
+cache arguments after apply with:
 
 ```bash
-helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster --version 0.10.0 \
-  -f https://raw.githubusercontent.com/superlinked/sie/v0.10.0/deploy/helm/sie-cluster/values-aks.yaml \
-  --namespace sie --create-namespace \
-  --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
-  $(terraform output -raw model_cache_helm_args)
+terraform output -raw model_cache_helm_args
 ```
 
 The chart auto-derives `payloadStore.url` from `workers.common.clusterCache.url`, so a single `--set` for the cache covers both the optional weights cache (`models/`) and the payload store (`payloads/`); the `payload_store_url` output is exposed for visibility and can be wired explicitly via `--set payloadStore.url=...` for the rare override case. On the chart side `payloadStore.enabled` defaults to `true`, decoupled from the optional `workers.common.clusterCache`. Operators who bring their own storage can opt out (`create_model_cache = false`) and wire `payloadStore.url` themselves; skipping the payload store entirely means work items larger than 1 MiB (e.g. images) fail.
