@@ -12,6 +12,12 @@ release commit overrides to these changes. CI checks these conventions because
 Release Please directory exclusions cannot exclude individual root files such
 as `README.md`.
 
+CI classifies a change as support-only only when every changed path is under
+the root `.github/`, `docs/`, `examples/`, or `tests/` directory; is one of
+the root files `.gitignore`, `.tflint.hcl`, `.release-please-manifest.json`,
+or `release-please-config.json`; or ends in `.md` (case-insensitive, at any
+depth). Any other path, including in a mixed change, is module payload.
+
 Use normal Conventional Commits (`fix:`, `feat:`, or a breaking-change marker)
 when changing the module itself. A change containing module code and
 documentation is still eligible for a module release. Unknown paths are treated
