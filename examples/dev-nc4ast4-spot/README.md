@@ -44,24 +44,18 @@ terraform apply
 
 After apply, deploy SIE via Helm:
 
-`helm pull` below selects the latest stable chart once. For production or an
-upgrade, add `--version <reviewed-chart-version>` to that command after
-replacing the placeholder. The Terraform module and SIE runtime versions are
-independent. Keep the extracted directory and record its chart metadata; its
-bundled README and values describe the selected release.
+This uses the latest stable chart and the AKS values on `main`; they are
+rolling, independent inputs. For an optional reproducible upgrade, add
+`--version <reviewed-chart-version>` to Helm and replace `main` in the values
+URL with the matching SIE release tag/ref.
 
 ```bash
 set -euo pipefail
 # Configure kubectl
 $(terraform output -raw kubectl_config_command)
 
-SIE_CHART_ROOT="$(mktemp -d)"
-helm pull oci://ghcr.io/superlinked/charts/sie-cluster \
-  --untar --untardir "$SIE_CHART_ROOT"
-SIE_CHART_DIR="$SIE_CHART_ROOT/sie-cluster"
-helm show chart "$SIE_CHART_DIR"
-helm upgrade --install sie-cluster "$SIE_CHART_DIR" \
-  -f "$SIE_CHART_DIR/values-aks.yaml" \
+helm upgrade --install sie-cluster oci://ghcr.io/superlinked/charts/sie-cluster \
+  -f https://raw.githubusercontent.com/superlinked/sie/main/deploy/helm/sie-cluster/values-aks.yaml \
   --namespace sie --create-namespace \
   --set "serviceAccount.annotations.azure\.workload\.identity/client-id=$(terraform output -raw sie_workload_identity_client_id)" \
   $(terraform output -raw model_cache_helm_args)
