@@ -30,6 +30,10 @@ The CPU and memory resource limits in `values-sie.yaml` describe host resources;
 
 ## Usage
 
+Run the following Terraform and Helm commands from
+`examples/dev-nv6adsa10-spot`, so Terraform uses this example's configuration
+and Helm can find the local `values-sie.yaml` overlay.
+
 The Kubernetes API server accepts only the CIDRs you list. Include the
 address the machine running Terraform, kubectl, and Helm uses to reach the
 Internet, because the module installs a Helm release during `terraform apply`.

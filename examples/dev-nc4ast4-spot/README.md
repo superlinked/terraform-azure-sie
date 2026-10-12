@@ -20,6 +20,9 @@ Creates a minimal AKS cluster with a single `Standard_NC4as_T4_v3` spot GPU pool
 
 ## Usage
 
+Run the following Terraform and Helm commands from
+`examples/dev-nc4ast4-spot`, so Terraform uses this example's configuration.
+
 The Kubernetes API server accepts only the CIDRs you list. Include the
 address the machine running Terraform, kubectl, and Helm uses to reach the
 Internet, because the module installs a Helm release during `terraform apply`.
