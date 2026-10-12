@@ -17,7 +17,7 @@ SUPPORT_FILES = frozenset({
 })
 NON_RELEASING_TITLE = re.compile(r"^(docs|chore|ci|test|style)(\([^()\r\n]+\))?: \S")
 RELEASE_OVERRIDE = re.compile(
-    r"BEGIN_(?:COMMIT_OVERRIDE|NESTED_COMMIT)|BREAKING[ -]CHANGE|^\s*(?:release-as\b|"
+    r"BEGIN_(?:COMMIT_OVERRIDE|NESTED_COMMIT)|BREAKING[ -]CHANGE\s*[:#]|^\s*(?:release-as\b|"
     r"(?:feat|feature|fix|perf|revert)(?:\([^()\r\n]*\))?:|"
     r"[a-z][a-z0-9_-]*(?:\([^()\r\n]*\))?!:)",
     re.IGNORECASE | re.MULTILINE,

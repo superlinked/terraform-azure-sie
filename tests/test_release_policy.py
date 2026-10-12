@@ -104,6 +104,21 @@ class ReleasePolicyTests(unittest.TestCase):
         )
         self.assertIn("Support-only", policy.validate_event(event("chore(main): release 1.0.2"), git))
 
+    def test_generated_major_release_body_is_allowed(self):
+        body = (ROOT / "tests/fixtures/release-pr-major.md").read_text()
+        self.assertIn("### ⚠ BREAKING CHANGES", body)
+        git = FakeGit(
+            paths=["CHANGELOG.md", ".release-please-manifest.json", "README.md", "examples/basic/main.tf"],
+            messages=["chore(main): release 2.0.0"],
+        )
+        self.assertIn("Support-only", policy.validate_event(event("chore(main): release 2.0.0", body), git))
+
+    def test_normal_breaking_changes_prose_is_allowed(self):
+        prose = "This section explains how to review breaking changes before an upgrade."
+        self.assertIn("Support-only", policy.validate_event(
+            event(body=prose), FakeGit(messages=[f"docs: explain upgrades\n\n{prose}"])
+        ))
+
     def test_exact_event_head_and_merge_base_are_used(self):
         git = FakeGit()
         policy.validate_event(event(), git)
