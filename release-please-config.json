@@ -10,8 +10,7 @@
         ".github",
         "docs",
         "examples",
-        "tests",
-        "scripts"
+        "tests"
       ],
       "extra-files": [
         "examples/dev-nc4ast4-spot/main.tf",

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("release_policy", ROOT / "scripts/check_release_policy.py")
+SPEC = importlib.util.spec_from_file_location("release_policy", ROOT / ".github/scripts/check_release_policy.py")
 policy = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(policy)
 BASE_SHA = "a" * 40
@@ -55,7 +55,7 @@ class ReleasePolicyTests(unittest.TestCase):
         paths = [
             "README.md", "CONTRIBUTING.md", "CHANGELOG.md", "docs/guide.md",
             "nested/notes.MD", ".github/workflows/ci.yml", "examples/basic/main.tf",
-            "tests/module.tftest.hcl", "scripts/check_release_policy.py", ".gitignore",
+            "tests/module.tftest.hcl", ".github/scripts/check_release_policy.py", ".gitignore",
             ".tflint.hcl", ".release-please-manifest.json", "release-please-config.json",
         ]
         self.assertTrue(all(policy.is_support_file(path) for path in paths))
@@ -73,9 +73,13 @@ class ReleasePolicyTests(unittest.TestCase):
     def test_breaking_and_release_overrides_are_rejected(self):
         for override in (
             "BREAKING CHANGE: changed", "BREAKING-CHANGE: changed",
+            "BREAKING CHANGE #removed API", "BREAKING-CHANGE #removed API",
+            "This is a BREAKING-CHANGE: incompatible command.",
+            "This is a BREAKING CHANGE: incompatible command.",
             "Release-As: 2.0.0", "release-as: 2.0.0", "BEGIN_COMMIT_OVERRIDE\nfix: docs",
             "Release-As #2.0.0", "Release-As(scope): 2.0.0",
             "<!-- BEGIN_COMMIT_OVERRIDE\nfix: docs\nEND_COMMIT_OVERRIDE -->",
+            "Text BEGIN_NESTED_COMMITfix: nestedEND_NESTED_COMMIT",
             "fix: nested footer", "feat(api): nested footer", "perf: nested footer",
             "chore!: nested breaking footer",
         ):
@@ -87,7 +91,7 @@ class ReleasePolicyTests(unittest.TestCase):
 
     def test_actual_mixed_and_unknown_payload_keep_normal_behavior(self):
         for path in ("main.tf", "versions.tf", "modules/network/main.tf", "runtime/entrypoint.sh",
-                     "docs-runtime/config.json", "future-payload.json"):
+                     "docs-runtime/config.json", "future-payload.json", "scripts/bootstrap.sh"):
             with self.subTest(path=path):
                 git = FakeGit(paths=["README.md", path], messages=["fix!: module change"])
                 self.assertIn("normal release", policy.validate_event(event("fix!: module"), git))
@@ -173,7 +177,7 @@ class ReleasePolicyTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text()
         self.assertIn("fetch-depth: 0", workflow)
         self.assertIn("types: [opened, synchronize, reopened, edited]", workflow)
-        self.assertIn("python3 scripts/check_release_policy.py", workflow)
+        self.assertIn("python3 .github/scripts/check_release_policy.py", workflow)
         self.assertIn("python3 -m unittest discover -s tests -p 'test_release_policy.py'", workflow)
 
 

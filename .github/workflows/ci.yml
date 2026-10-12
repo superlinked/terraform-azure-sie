@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check release policy
-        run: python3 scripts/check_release_policy.py
+        run: python3 .github/scripts/check_release_policy.py
 
       - name: Test release policy
         run: python3 -m unittest discover -s tests -p 'test_release_policy.py'
